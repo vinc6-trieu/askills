@@ -27,6 +27,14 @@ import {
   codexCommand
 } from "./commands/codex.js";
 
+import {
+  claudeCommand
+} from "./commands/claude.js";
+
+import {
+  runCommand
+} from "./commands/run.js";
+
 const program = new Command();
 
 program
@@ -139,6 +147,76 @@ program
       }
     ) => {
       await codexCommand(
+        task,
+        options
+      );
+    }
+  );
+
+program
+  .command("claude")
+  .description(
+    "Resolve skills and launch Claude Code"
+  )
+  .argument(
+    "<task>",
+    "Coding task"
+  )
+  .option(
+    "-p, --print",
+    "Run Claude non-interactively and exit"
+  )
+  .option(
+    "--dry-run",
+    "Resolve skills without launching Claude"
+  )
+  .action(
+    async (
+      task: string,
+      options: {
+        print?: boolean;
+        dryRun?: boolean;
+      }
+    ) => {
+      await claudeCommand(
+        task,
+        options
+      );
+    }
+  );
+
+program
+  .command("run")
+  .description(
+    "Resolve skills and launch a coding agent"
+  )
+  .argument(
+    "<agent>",
+    "Agent: codex or claude"
+  )
+  .argument(
+    "<task>",
+    "Coding task"
+  )
+  .option(
+    "--non-interactive",
+    "Run agent non-interactively"
+  )
+  .option(
+    "--dry-run",
+    "Resolve without launching"
+  )
+  .action(
+    async (
+      agent: string,
+      task: string,
+      options: {
+        nonInteractive?: boolean;
+        dryRun?: boolean;
+      }
+    ) => {
+      await runCommand(
+        agent,
         task,
         options
       );

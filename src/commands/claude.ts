@@ -3,28 +3,28 @@ import {
 } from "../core/agent-runner.js";
 
 import {
-  codexAdapter
-} from "../adapters/codex.js";
+  claudeAdapter
+} from "../adapters/claude.js";
 
-interface CodexOptions {
-  exec?: boolean;
+interface ClaudeOptions {
+  print?: boolean;
   dryRun?: boolean;
 }
 
-export async function codexCommand(
+export async function claudeCommand(
   task: string,
-  options: CodexOptions
+  options: ClaudeOptions
 ): Promise<void> {
 
   await runAgent(
-    codexAdapter,
+    claudeAdapter,
     task,
     {
       dryRun:
         options.dryRun,
 
       nonInteractive:
-        options.exec
+        options.print
     }
   );
 }

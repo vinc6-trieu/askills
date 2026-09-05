@@ -27,6 +27,10 @@ import {
   ensureAskillsGitignore
 } from "../core/gitignore.js";
 
+import {
+  prepareClaudeSkills
+} from "../core/claude-skills.js";
+
 const CODEX_GENERATED_PREFIX =
   "askills--";
 
@@ -290,6 +294,12 @@ export async function bootstrapCommand(): Promise<void> {
     });
   }
 
+  const claude =
+    await prepareClaudeSkills(
+      skillIds,
+      root
+    );
+
   const state = {
     version: 1,
 
@@ -306,6 +316,17 @@ export async function bootstrapCommand(): Promise<void> {
 
         skills:
           installed.length
+      },
+
+      claude: {
+        path:
+          claude.root,
+
+        skills:
+          claude.installed.length,
+
+        skipped:
+          claude.skipped.length
       }
     },
 
@@ -347,6 +368,28 @@ export async function bootstrapCommand(): Promise<void> {
   console.log(
     `  Codex: ${codexSkillsRoot}`
   );
+
+  console.log(
+    `  Claude: ${claude.root}`
+  );
+
+  if (claude.skipped.length > 0) {
+    console.log();
+
+    console.log(
+      pc.yellow(
+        "  Claude skill collisions:"
+      )
+    );
+
+    for (
+      const item of claude.skipped
+    ) {
+      console.log(
+        `    ${item.name}: ${item.reason}`
+      );
+    }
+  }
 
   console.log();
 }
