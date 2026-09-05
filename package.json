@@ -1,0 +1,41 @@
+{
+  "name": "askills",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "description": "Portable skill registry, resolver, and adapter layer for coding agents such as Codex and Claude Code.",
+  "dependencies": {
+    "commander": "^15.0.0",
+    "fast-glob": "^3.3.3",
+    "picocolors": "^1.1.1",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  },
+  "type": "module",
+  "bin": {
+    "askills": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vinc6-trieu/askills.git"
+  },
+  "homepage": "https://github.com/vinc6-trieu/askills#readme",
+  "bugs": {
+    "url": "https://github.com/vinc6-trieu/askills/issues"
+  }
+}
