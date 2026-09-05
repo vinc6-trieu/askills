@@ -1,5 +1,5 @@
 {
-  "name": "@vinc6-trieu/askills",
+  "name": "@vincent6.trieu/askills",
   "version": "0.3.0",
   "main": "index.js",
   "scripts": {
@@ -25,7 +25,7 @@
   },
   "type": "module",
   "bin": {
-    "askills": "./dist/cli.js"
+    "askills": "dist/cli.js"
   },
   "files": [
     "dist"
