@@ -1,0 +1,6 @@
+id: global/tdd
+kind: process
+intents: [tdd]
+keywords: [test, tdd]
+priority: 80
+auto: true

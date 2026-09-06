@@ -1,0 +1,4 @@
+{
+  "name": "ts-node",
+  "dependencies": { "typescript": "^5.4.0" }
+}

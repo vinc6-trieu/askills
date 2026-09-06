@@ -1,0 +1,7 @@
+[project]
+name = "svc"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn",
+  "pydantic>=2",
+]

@@ -1,0 +1,6 @@
+{
+  "name": "broken",
+  "dependencies": {
+    "axum": "0.7",
+  }
+}

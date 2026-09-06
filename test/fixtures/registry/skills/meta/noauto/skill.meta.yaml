@@ -1,0 +1,5 @@
+id: meta/noauto
+kind: meta
+keywords: [meta]
+priority: 10
+auto: false
