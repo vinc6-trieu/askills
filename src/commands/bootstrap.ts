@@ -20,7 +20,8 @@ import {
 } from "../core/skill-registry.js";
 
 import {
-  loadSkillDescriptor
+  loadSkillDescriptor,
+  type SkillDescriptor
 } from "../core/skill-frontmatter.js";
 
 import {
@@ -30,6 +31,10 @@ import {
 import {
   prepareClaudeSkills
 } from "../core/claude-skills.js";
+
+import {
+  writeAgentGuides
+} from "../core/agent-guide.js";
 
 const CODEX_GENERATED_PREFIX =
   "askills--";
@@ -221,6 +226,9 @@ export async function bootstrapCommand(): Promise<void> {
     name: string;
   }> = [];
 
+  const descriptors:
+    SkillDescriptor[] = [];
+
   const skillNames =
     new Map<string, string>();
 
@@ -292,11 +300,22 @@ export async function bootstrapCommand(): Promise<void> {
       id,
       name: descriptor.name
     });
+
+    descriptors.push(
+      descriptor
+    );
   }
 
   const claude =
     await prepareClaudeSkills(
       skillIds,
+      root
+    );
+
+  const agentGuides =
+    await writeAgentGuides(
+      descriptors,
+      config.agent_instructions !== false,
       root
     );
 
@@ -327,6 +346,17 @@ export async function bootstrapCommand(): Promise<void> {
 
         skipped:
           claude.skipped.length
+      },
+
+      agents: {
+        instructions:
+          config.agent_instructions !== false,
+
+        written:
+          agentGuides.written,
+
+        removed:
+          agentGuides.removed
       }
     },
 
@@ -372,6 +402,18 @@ export async function bootstrapCommand(): Promise<void> {
   console.log(
     `  Claude: ${claude.root}`
   );
+
+  if (agentGuides.written.length > 0) {
+    console.log(
+      `  Agent guides: ${agentGuides.written.join(", ")}`
+    );
+  }
+
+  if (agentGuides.removed.length > 0) {
+    console.log(
+      `  Agent guides removed: ${agentGuides.removed.join(", ")}`
+    );
+  }
 
   if (claude.skipped.length > 0) {
     console.log();

@@ -152,6 +152,10 @@ For Codex integration:
 
 * Codex CLI and/or the Codex VS Code extension
 
+For Claude Code integration:
+
+* Claude Code CLI and/or the Claude Code IDE extension
+
 ---
 
 ## Installation
@@ -259,15 +263,21 @@ Generated files are stored under:
 .askills/
 ```
 
-For Codex-native discovery, askills also exposes skills under:
+For agent-native discovery, askills also exposes skills under:
 
 ```text
-.agents/skills/
+.agents/skills/     Codex
+.claude/skills/     Claude Code
 ```
 
 using symlinks to the central registry.
 
 The skills themselves are not copied into the repository.
+
+Unless disabled, bootstrap also writes an askills-managed block into
+`CLAUDE.md` and `AGENTS.md` at the repository root so an agent knows the
+project's skills come from askills even during unstructured IDE chat.
+See [How agents discover and use skills](#how-agents-discover-and-use-skills).
 
 ---
 
@@ -317,6 +327,96 @@ skill priority
 ```
 
 The goal is normally to select a small set of relevant skills rather than loading the whole registry.
+
+---
+
+# How agents discover and use skills
+
+askills does not replace an agent's own skill routing. It exposes the
+project's candidate pool in each agent's native format and then adds a
+light instruction layer on top.
+
+## 1. Native discovery
+
+`askills bootstrap` links every skill in the project pool into the
+location the agent already scans:
+
+```text
+.agents/skills/askills--<flattened-id>     Codex
+.claude/skills/<skill-name>                Claude Code
+```
+
+Each entry is a symlink back to the central registry. The agent
+discovers these skills the same way it discovers a hand-written project
+skill, matching on the `description` in `SKILL.md`.
+
+A real project-owned skill of the same name always wins; askills skips
+it rather than overwriting it.
+
+## 2. Managed instruction block
+
+Description matching alone does not tell an agent that a pool is
+curated and authoritative, and in free-form IDE chat there is no task
+string to route from. To close that gap, bootstrap writes a delimited
+block into the repository's agent instruction files:
+
+```text
+CLAUDE.md
+AGENTS.md
+```
+
+```markdown
+<!-- >>> askills managed >>> -->
+
+## Skills (managed by askills)
+
+...guidance for the agent...
+
+Current pool:
+
+- `systematic-debugging` — Diagnose bugs, regressions, crashes, ...
+- `tdd` — ...
+- `rust` — ...
+
+<!-- <<< askills managed <<< -->
+```
+
+Properties of the block:
+
+```text
+delimited      only the marked region is owned by askills
+regenerated    rewritten on every bootstrap
+non-destructive appended; existing content is never modified
+committed      it is meant to be checked in so teammates' agents see it
+```
+
+Disable it per project:
+
+```yaml
+version: 1
+
+profile: backend-rust
+
+agent_instructions: false
+```
+
+With `agent_instructions: false`, the next bootstrap removes the block
+(and deletes `CLAUDE.md` / `AGENTS.md` if askills was the only thing in
+them). Native discovery under `.agents/skills/` and `.claude/skills/`
+still works.
+
+## 3. Per-task routing
+
+When you launch an agent through askills, the resolver runs first and
+the selected skills are passed to the agent explicitly:
+
+```text
+askills codex "<task>"     $skill markers in the prompt
+askills claude "<task>"    --append-system-prompt routing hint
+```
+
+This is the strongest signal, but it is optional. `bootstrap` plus
+native discovery is enough for day-to-day IDE use.
 
 ---
 
@@ -414,6 +514,87 @@ look for possible race conditions
 ```
 
 without locking the conversation to one pre-resolved task.
+
+---
+
+# Claude Code integration
+
+## Claude Code CLI
+
+Run a task through askills:
+
+```bash
+askills claude \
+  "Fix the enrollment worker race condition and add regression coverage"
+```
+
+askills will:
+
+```text
+read project config
+      ↓
+bootstrap candidate skills
+      ↓
+resolve relevant skills
+      ↓
+prepare active skill state
+      ↓
+launch Claude Code
+```
+
+The resolved skills are passed to Claude as a routing hint through
+`--append-system-prompt`. Claude still loads the skill bodies itself
+from `.claude/skills/`.
+
+Preview what would be selected without launching Claude:
+
+```bash
+askills claude \
+  "Review the enrollment module for race conditions" \
+  --dry-run
+```
+
+Run Claude non-interactively:
+
+```bash
+askills claude \
+  "Fix the failing enrollment tests" \
+  --print
+```
+
+---
+
+## Claude Code in the IDE
+
+For interactive IDE usage you do not need a resolver before every
+message.
+
+Run:
+
+```bash
+askills bootstrap
+```
+
+askills exposes the project's candidate skills as symlinks under:
+
+```text
+.claude/skills/
+├── systematic-debugging
+├── tdd
+├── rust
+└── ...
+```
+
+Each directory points back to the central registry, and Claude Code
+discovers them as ordinary project skills.
+
+Because askills also maintains the managed block in `CLAUDE.md`, Claude
+knows the pool is curated even when the conversation has no resolved
+task attached.
+
+The generated symlinks are added to `.git/info/exclude` (a local,
+uncommitted ignore) so they never show up as untracked files, while a
+project-owned skill of the same name is left untouched.
 
 ---
 
@@ -527,7 +708,18 @@ askills resolve \
   --profile backend-rust
 ```
 
-When `.agent-skills.yaml` exists, the project profile can be used automatically.
+When `.agent-skills.yaml` exists, its `profile`, `include`, and `exclude`
+are used automatically. `--profile` overrides the profile.
+
+See why a skill was or was not picked:
+
+```bash
+askills resolve "<task>" --verbose
+```
+
+`--verbose` lists every scored candidate with its score and the reason
+it was rejected (below threshold, category limit, `max_auto_skills`,
+`auto: false`).
 
 ---
 
@@ -544,6 +736,43 @@ Options:
 ```text
 --dry-run    Resolve and prepare skills without launching Codex
 --exec       Run Codex non-interactively
+```
+
+---
+
+## `askills claude`
+
+Resolve skills and launch Claude Code.
+
+```bash
+askills claude "<task>"
+```
+
+Options:
+
+```text
+--dry-run       Resolve skills without launching Claude
+-p, --print     Run Claude non-interactively and exit
+```
+
+---
+
+## `askills run`
+
+Resolve skills and launch a coding agent by name. This is the
+agent-neutral entry point that `askills codex` and `askills claude`
+wrap.
+
+```bash
+askills run codex "<task>"
+askills run claude "<task>"
+```
+
+Options:
+
+```text
+--dry-run           Resolve without launching
+--non-interactive   Run the agent non-interactively
 ```
 
 ---
@@ -569,11 +798,21 @@ skills:
 
   exclude:
     - global/prototyping
+
+agent_instructions: true
 ```
 
-`include` adds skills outside the normal profile pool.
+`include` adds skills outside the normal profile pool and forces them
+into the resolved set, bypassing the score threshold and the
+category / `max_auto_skills` limits. Use it for skills you always want
+active in this project regardless of the task wording.
 
-`exclude` removes inherited or profile-provided skills.
+`exclude` removes inherited or profile-provided skills, including
+`always` skills.
+
+`agent_instructions` controls the askills-managed block in `CLAUDE.md`
+and `AGENTS.md`. It defaults to `true`; set it to `false` to keep those
+files untouched and rely on native discovery only.
 
 ---
 
@@ -781,40 +1020,55 @@ instead of accumulating hard-coded special cases in the CLI.
 
 # Repository detection
 
-askills can detect common repository signals.
-
-Examples:
+askills reads the root manifests and does a shallow scan of common
+monorepo layouts, then merges everything into one set of signals:
 
 ```text
-Cargo.toml
-  → Rust
+languages       rust, typescript, javascript, python, golang, java,
+                kotlin, ruby, php, csharp, elixir, dart
 
-Cargo.toml + axum
-  → Axum
+frameworks      axum, actix, rocket, sqlx, diesel, tonic, tokio,
+                nextjs, nuxt, react, vue, svelte, sveltekit, angular,
+                astro, remix, nestjs, express, fastify, koa,
+                prisma, typeorm, drizzle, mongoose, postgres, redis,
+                kafka, graphql,
+                django, flask, fastapi, celery,
+                gin, echo, fiber, grpc,
+                spring, quarkus, micronaut, ktor,
+                rails, laravel, symfony, phoenix, flutter, yew, leptos
 
-Cargo.toml + sqlx
-  → SQLx
-
-package.json + TypeScript
-  → TypeScript
-
-@nestjs/core
-  → NestJS
-
-next
-  → Next.js
-
-react
-  → React
-
-go.mod
-  → Go
-
-pom.xml
-  → Java
+files           Cargo.toml, package.json, tsconfig.json, go.mod,
+                pom.xml, pyproject.toml, Dockerfile, migrations/, ...
 ```
 
-Detection is intentionally conservative.
+Example:
+
+```text
+Cargo.toml with axum in [dependencies]   → rust + axum
+package.json with next + react           → typescript + nextjs + react
+apps/api (express) + apps/web (next)     → merged: express + nextjs
+pyproject.toml with fastapi              → python + fastapi
+```
+
+The monorepo scan is bounded:
+
+```text
+- one level of any child that has a manifest
+- two levels under apps/, packages/, services/, libs/, crates/, ...
+- never descends into node_modules, target, dist, build, vendor, ...
+- capped at 60 sub-projects
+```
+
+Dependency parsing is section-aware for `Cargo.toml` (only real
+`[dependencies]` entries count, not comments or the crate
+description).
+
+`primaryLanguage` is taken from the root manifest when there is one,
+otherwise from the most common language across sub-projects. Profile
+detection uses it to break ties in polyglot repositories.
+
+Detection is intentionally conservative: an unrecognized repository
+resolves to the `coding` profile.
 
 ---
 
@@ -823,12 +1077,13 @@ Detection is intentionally conservative.
 askills may create:
 
 ```text
-.agent-skills.yaml
+.agent-skills.yaml        project configuration (commit this)
 
-.askills/
+.askills/                 generated runtime
 ├── pool/
 ├── active/
 ├── active.yaml
+├── claude-skills.yaml
 └── state.yaml
 
 .agents/
@@ -836,6 +1091,15 @@ askills may create:
     ├── askills--global--tdd
     ├── askills--languages--rust
     └── ...
+
+.claude/
+└── skills/
+    ├── tdd
+    ├── rust
+    └── ...
+
+CLAUDE.md                 askills-managed block appended (commit this)
+AGENTS.md                 askills-managed block appended (commit this)
 ```
 
 Recommended `.gitignore`:
@@ -846,13 +1110,23 @@ Recommended `.gitignore`:
 .agents/skills/askills-generated/
 ```
 
+`bootstrap` maintains `.gitignore` for the `.agents/skills/askills--*`
+entries. The `.claude/skills/*` symlinks are instead added to
+`.git/info/exclude`, a local ignore that is not committed, so different
+machines can regenerate them without a shared `.gitignore` rule.
+
 Do **not** ignore all of:
 
 ```text
 .agents/skills/
+.claude/skills/
 ```
 
 because a repository may also contain project-owned skills that should be committed.
+
+`CLAUDE.md` and `AGENTS.md` are **not** ignored. The askills block
+between its markers is regenerated on every bootstrap and is meant to
+be committed alongside the rest of those files.
 
 ---
 
@@ -941,6 +1215,71 @@ company-agent-skills
 Private Git repositories can use normal SSH authentication.
 
 Support for composing multiple registries is planned.
+
+---
+
+# Troubleshooting
+
+### `Profile "<name>" not found`
+
+The profile named in `.agent-skills.yaml` does not exist in the
+installed registry.
+
+```bash
+askills sync
+ls ~/.askills/registry/profiles
+```
+
+Fix the `profile:` value or run `askills init --auto --force`.
+
+### `Skill not found in registry: <id>`
+
+An `include` entry, or a profile pool entry, points at a skill the
+registry does not contain. Check the id against:
+
+```bash
+ls ~/.askills/registry/skills/<layer>
+```
+
+and run `askills sync` if the registry is stale.
+
+### `Duplicate skill name "<name>"`
+
+Two skills in the resolved pool expose the same `name` in their
+`SKILL.md` frontmatter. Agent skill names must be unique inside one
+project. Rename one skill in the registry, or `exclude` one of them in
+`.agent-skills.yaml`.
+
+### `Claude skill collisions` after bootstrap
+
+A skill was skipped because a project-owned skill of the same name
+already exists under `.claude/skills/`. This is intentional; the
+project skill wins. Remove or rename the local skill if you want the
+askills version instead.
+
+### Symlinks on Windows
+
+askills creates directory junctions on Windows instead of POSIX
+symlinks. If junction creation fails, run the shell as Administrator or
+enable Developer Mode.
+
+### The resolver selected fewer skills than expected
+
+Selection is capped by `policy.max_auto_skills` and by per-category
+limits, and a skill only counts once its score clears the threshold.
+Inspect the scoring with:
+
+```bash
+askills resolve "<task>" --profile <profile>
+```
+
+and improve routing through `skill.meta.yaml` rather than the CLI.
+
+### The managed block keeps reappearing in `CLAUDE.md`
+
+That is expected while `agent_instructions` is `true`. Set it to
+`false` in `.agent-skills.yaml` and run `askills bootstrap` once to
+remove it.
 
 ---
 
@@ -1059,10 +1398,17 @@ When an agent already supports skill discovery, askills should expose skills in 
 * [x] Codex CLI adapter
 * [x] Codex repository skill discovery
 * [x] Codex VS Code workflow
+* [x] Claude Code adapter
+* [x] Claude Code repository skill discovery
+* [x] managed instruction block (`CLAUDE.md` / `AGENTS.md`)
+* [x] resolver diagnostics (`askills resolve --verbose`)
+* [x] deterministic tie-breaking
+* [x] forced `include` skills
+* [x] monorepo detection
+* [x] multi-language / multi-framework detection
 
 ## Next
 
-* [ ] Claude Code adapter
 * [ ] additional coding-agent adapters
 * [ ] multiple registry support
 * [ ] registry precedence and namespacing
@@ -1074,8 +1420,6 @@ When an agent already supports skill discovery, askills should expose skills in 
 * [ ] `askills add`
 * [ ] `askills remove`
 * [ ] `askills open`
-* [ ] richer repository detection
-* [ ] resolver diagnostics
 * [ ] optional remote registry / MCP integration
 
 ---

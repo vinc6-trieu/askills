@@ -60,7 +60,8 @@ export async function initCommand(
       skills: {
         include: [],
         exclude: []
-      }
+      },
+      agent_instructions: true
     },
     root
   );

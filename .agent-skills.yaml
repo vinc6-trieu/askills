@@ -3,3 +3,4 @@ profile: coding
 skills:
   include: []
   exclude: []
+agent_instructions: true

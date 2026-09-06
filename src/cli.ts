@@ -42,7 +42,7 @@ program
   .description(
     "Portable coding-agent skill manager"
   )
-  .version("0.3.0");
+  .version("0.4.0");
 
 program
   .command("setup")
@@ -109,10 +109,17 @@ program
     "--profile <profile>",
     "Skill profile"
   )
+  .option(
+    "-v, --verbose",
+    "Show every scored candidate and why it was not selected"
+  )
   .action(
     async (
       task: string,
-      options: { profile?: string }
+      options: {
+        profile?: string;
+        verbose?: boolean;
+      }
     ) => {
       await resolveCommand(
         task,

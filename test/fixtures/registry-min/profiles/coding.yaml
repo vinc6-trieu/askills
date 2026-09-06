@@ -1,0 +1,10 @@
+name: coding
+always:
+  - global/systematic-debugging
+pool:
+  - global/tdd
+  - languages/rust
+  - domains/event-driven
+  - meta/noauto
+policy:
+  max_auto_skills: 4

@@ -40,6 +40,15 @@ export async function loadSkillMeta(
   }
 }
 
+/*
+ * Lenient bulk loader used by the resolver.
+ *
+ * A single skill with missing or invalid metadata
+ * should not abort resolution for the whole pool;
+ * it is warned about and left unscored. Bootstrap
+ * still validates every skill strictly via
+ * loadSkillMeta.
+ */
 export async function loadSkillMetas(
   ids: string[]
 ): Promise<Map<string, SkillMeta>> {
@@ -48,10 +57,20 @@ export async function loadSkillMetas(
     new Map<string, SkillMeta>();
 
   for (const id of ids) {
-    result.set(
-      id,
-      await loadSkillMeta(id)
-    );
+    try {
+      result.set(
+        id,
+        await loadSkillMeta(id)
+      );
+    } catch (error) {
+      console.warn(
+        `askills: skipping "${id}" during resolution: ${
+          error instanceof Error
+            ? error.message
+            : String(error)
+        }`
+      );
+    }
   }
 
   return result;

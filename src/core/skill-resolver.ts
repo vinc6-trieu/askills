@@ -11,12 +11,69 @@ import type {
   SkillMeta,
 } from "./types.js";
 
+const SCORE_THRESHOLD = 15;
+
+interface TaskQuery {
+  text: string;
+  tokens: Set<string>;
+}
+
 function normalize(value: string): string {
   return value.toLowerCase().trim();
 }
 
-function includesText(task: string, candidate: string): boolean {
-  return task.includes(normalize(candidate));
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function tokenize(value: string): Set<string> {
+  return new Set(
+    normalize(value)
+      .split(/[^a-z0-9#+.]+/)
+      .filter(Boolean),
+  );
+}
+
+export function buildQuery(taskRaw: string): TaskQuery {
+  return {
+    text: normalize(taskRaw),
+    tokens: tokenize(taskRaw),
+  };
+}
+
+/*
+ * Match a routing term against the task.
+ *
+ * Multi-word or path/hyphen terms are matched as a
+ * word-bounded phrase; single tokens must appear as a
+ * whole word in the task (with a light plural fold), so
+ * "go" no longer matches "goal" and "react" no longer
+ * matches "reaction".
+ */
+export function matchesTerm(query: TaskQuery, term: string): boolean {
+  const needle = normalize(term);
+
+  if (!needle) {
+    return false;
+  }
+
+  if (/[\s\-/]/.test(needle)) {
+    const pattern = new RegExp(
+      `(^|[^a-z0-9])${escapeRegExp(needle)}([^a-z0-9]|$)`,
+    );
+
+    return pattern.test(query.text);
+  }
+
+  if (query.tokens.has(needle)) {
+    return true;
+  }
+
+  if (query.tokens.has(`${needle}s`)) {
+    return true;
+  }
+
+  return needle.endsWith("s") && query.tokens.has(needle.slice(0, -1));
 }
 
 function intersection(a: string[], b: string[]): string[] {
@@ -26,23 +83,23 @@ function intersection(a: string[], b: string[]): string[] {
 }
 
 function scoreSkill(
-  taskRaw: string,
+  query: TaskQuery,
   meta: SkillMeta,
   repo: Awaited<ReturnType<typeof detectRepository>>,
 ): ScoredSkill {
-  const task = normalize(taskRaw);
-
   let score = 0;
 
   const reasons: string[] = [];
 
-  if (includesText(task, meta.id)) {
+  const idTail = meta.id.split("/").pop() ?? meta.id;
+
+  if (matchesTerm(query, meta.id) || matchesTerm(query, idTail)) {
     score += 100;
     reasons.push("explicit skill match");
   }
 
   for (const intent of meta.intents ?? []) {
-    if (includesText(task, intent)) {
+    if (matchesTerm(query, intent)) {
       score += 35;
       reasons.push(`intent:${intent}`);
     }
@@ -51,7 +108,7 @@ function scoreSkill(
   let keywordScore = 0;
 
   for (const keyword of meta.keywords ?? []) {
-    if (includesText(task, keyword)) {
+    if (matchesTerm(query, keyword)) {
       keywordScore += 10;
       reasons.push(`keyword:${keyword}`);
     }
@@ -94,13 +151,16 @@ function scoreSkill(
     reasons.push(`repo:${fileMatches.join(",")}`);
   }
 
-  score += Math.min(meta.priority ?? 0, 100) / 10;
+  const priority = Math.min(meta.priority ?? 0, 100);
+
+  score += priority / 10;
 
   return {
     id: meta.id,
     kind: meta.kind,
     score,
     reasons,
+    priority: meta.priority ?? 0,
   };
 }
 
@@ -137,7 +197,13 @@ export async function resolveSkills(
 
   const repo = await detectRepository(root);
 
+  const query = buildQuery(task);
+
   const excluded = new Set(overrides.exclude ?? []);
+
+  const forced = new Set(
+    (overrides.include ?? []).filter((id) => !excluded.has(id)),
+  );
 
   const always = profile.always.filter((id) => !excluded.has(id));
 
@@ -150,45 +216,91 @@ export async function resolveSkills(
   const scored: ScoredSkill[] = [];
 
   for (const meta of metas.values()) {
-    if (meta.auto === false) {
+    const item = scoreSkill(query, meta, repo);
+
+    if (meta.auto === false && !forced.has(meta.id)) {
+      item.rejection = "auto: false";
+      scored.push(item);
       continue;
     }
 
-    scored.push(scoreSkill(task, meta, repo));
+    scored.push(item);
   }
 
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort(
+    (a, b) =>
+      b.score - a.score ||
+      b.priority - a.priority ||
+      a.id.localeCompare(b.id),
+  );
+
+  const selectable = scored.filter((item) => item.rejection === undefined);
 
   const selected: ScoredSkill[] = [];
+
+  const selectedIds = new Set<string>();
 
   const countByKind = new Map<SkillKind, number>();
 
   for (const kind of KIND_ORDER) {
     const limit = SLOT_LIMITS[kind] ?? 0;
 
-    if (limit <= 0) {
-      continue;
-    }
-
-    const candidates = scored.filter(
-      (item) => item.kind === kind && item.score >= 15,
-    );
+    const candidates = selectable.filter((item) => item.kind === kind);
 
     for (const candidate of candidates) {
+      if (candidate.score < SCORE_THRESHOLD) {
+        candidate.rejection =
+          `score ${candidate.score.toFixed(1)} < ${SCORE_THRESHOLD}`;
+        continue;
+      }
+
+      if (limit <= 0) {
+        candidate.rejection = `category "${kind}" is not auto-selected`;
+        continue;
+      }
+
       const current = countByKind.get(kind) ?? 0;
 
       if (current >= limit) {
-        break;
+        candidate.rejection = `category "${kind}" limit ${limit} reached`;
+        continue;
       }
 
       if (selected.length >= profile.maxAutoSkills) {
-        break;
+        candidate.rejection =
+          `max_auto_skills ${profile.maxAutoSkills} reached`;
+        continue;
       }
 
+      candidate.selected = true;
       selected.push(candidate);
-
+      selectedIds.add(candidate.id);
       countByKind.set(kind, current + 1);
     }
+  }
+
+  /*
+   * Skills listed in `.agent-skills.yaml` include are an
+   * explicit request. They bypass the score threshold and
+   * the category / max_auto_skills limits.
+   */
+  for (const id of forced) {
+    if (selectedIds.has(id) || always.includes(id)) {
+      continue;
+    }
+
+    const item = scored.find((entry) => entry.id === id);
+
+    if (!item) {
+      continue;
+    }
+
+    item.selected = true;
+    item.rejection = undefined;
+    item.reasons.unshift("config include (forced)");
+
+    selected.push(item);
+    selectedIds.add(id);
   }
 
   return {
@@ -196,5 +308,6 @@ export async function resolveSkills(
     repo,
     always,
     selected,
+    candidates: scored,
   };
 }

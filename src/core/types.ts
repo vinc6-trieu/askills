@@ -73,6 +73,15 @@ export interface RepoContext {
   dependencies: string[];
 
   files: string[];
+
+  /*
+   * Best guess at the repository's primary language,
+   * taken from the root manifest when there is one,
+   * otherwise the most common language across detected
+   * sub-projects. Used to bias profile detection in
+   * polyglot repositories.
+   */
+  primaryLanguage?: string;
 }
 
 export interface ScoredSkill {
@@ -83,6 +92,15 @@ export interface ScoredSkill {
   score: number;
 
   reasons: string[];
+
+  priority: number;
+
+  /*
+   * Populated by the resolver after selection.
+   */
+  selected?: boolean;
+
+  rejection?: string;
 }
 
 export interface ResolveResult {
@@ -93,4 +111,11 @@ export interface ResolveResult {
   always: string[];
 
   selected: ScoredSkill[];
+
+  /*
+   * Every scored candidate, sorted best-first and
+   * annotated with selected / rejection. Used by
+   * `askills resolve --verbose`.
+   */
+  candidates: ScoredSkill[];
 }

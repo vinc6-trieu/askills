@@ -1,0 +1,5 @@
+id: languages/rust
+kind: language
+languages: [rust]
+priority: 50
+auto: true

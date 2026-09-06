@@ -11,6 +11,12 @@ export interface ProjectConfig {
     include?: string[];
     exclude?: string[];
   };
+
+  /*
+   * Write the askills-managed block into CLAUDE.md / AGENTS.md
+   * during bootstrap. Defaults to true when omitted.
+   */
+  agent_instructions?: boolean;
 }
 
 export function projectConfigPath(

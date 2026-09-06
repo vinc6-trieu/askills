@@ -1,0 +1,5 @@
+id: domains/event-driven
+kind: domain
+keywords: [kafka, queue, event, broker]
+priority: 40
+auto: true

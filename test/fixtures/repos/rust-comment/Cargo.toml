@@ -1,0 +1,8 @@
+[package]
+name = "router"
+version = "0.1.0"
+description = "a small axum-free http router"
+# inspired by axum ergonomics
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }

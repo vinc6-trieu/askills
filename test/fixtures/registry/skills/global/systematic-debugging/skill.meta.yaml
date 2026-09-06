@@ -1,0 +1,6 @@
+id: global/systematic-debugging
+kind: process
+intents: [debug, bugfix]
+keywords: [bug, crash, panic, timeout]
+priority: 90
+auto: true
