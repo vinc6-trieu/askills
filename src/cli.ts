@@ -4,6 +4,10 @@ import { Command } from "commander";
 import pc from "picocolors";
 
 import {
+  VERSION
+} from "./version.js";
+
+import {
   resolveCommand
 } from "./commands/resolve.js";
 
@@ -51,7 +55,7 @@ program
   .description(
     "Portable coding-agent skill manager"
   )
-  .version("0.4.0");
+  .version(VERSION);
 
 program
   .command("setup")

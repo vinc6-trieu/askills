@@ -1,6 +1,6 @@
 {
   "name": "@vincent6.trieu/askills",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "main": "index.js",
   "scripts": {
     "test": "node --import tsx --test test/*.test.ts",
