@@ -3,8 +3,14 @@ import path from "node:path";
 import YAML from "yaml";
 
 import {
-  profilesRoot
-} from "./paths.js";
+  createRegistryContext
+} from "./registry-config.js";
+
+import {
+  formatRegistryReference,
+  parseRegistryReference,
+  type RegistryContext
+} from "./registry-context.js";
 
 import type {
   ProfileFile,
@@ -12,22 +18,42 @@ import type {
 } from "./types.js";
 
 async function loadProfile(
-  name: string
-): Promise<ProfileFile> {
-  const file = path.join(
-    profilesRoot(),
-    `${name}.yaml`
-  );
+  name: string,
+  context: RegistryContext,
+  defaultRegistry?: string
+): Promise<{ profile: ProfileFile; registry: string }> {
+  const parsed = parseRegistryReference(name);
 
-  try {
-    const raw = await fs.readFile(file, "utf8");
-
-    return YAML.parse(raw) as ProfileFile;
-  } catch {
-    throw new Error(
-      `Profile "${name}" not found: ${file}`
-    );
+  if (
+    !parsed.id ||
+    path.isAbsolute(parsed.id) ||
+    parsed.id.includes("\\") ||
+    parsed.id.split("/").some(part => part === "." || part === ".." || part.length === 0)
+  ) {
+    throw new Error(`Invalid profile name: ${name}`);
   }
+
+  const registries = parsed.registry
+    ? context.registries.filter(item => item.name === parsed.registry)
+    : defaultRegistry
+      ? context.registries.filter(item => item.name === defaultRegistry)
+      : context.registries;
+
+  for (const registry of registries) {
+    const file = path.join(registry.root, "profiles", `${parsed.id}.yaml`);
+
+    try {
+      const raw = await fs.readFile(file, "utf8");
+      return {
+        profile: YAML.parse(raw) as ProfileFile,
+        registry: registry.name
+      };
+    } catch {
+      // Try the next lower-precedence registry.
+    }
+  }
+
+  throw new Error(`Profile "${name}" not found in configured registries.`);
 }
 
 function unique(values: string[]): string[] {
@@ -35,8 +61,11 @@ function unique(values: string[]): string[] {
 }
 
 export async function resolveProfile(
-  name: string
+  name: string,
+  context?: RegistryContext,
+  root = process.cwd()
 ): Promise<ResolvedProfile> {
+  const registryContext = context ?? await createRegistryContext(root);
   const stack = new Set<string>();
 
   async function resolve(
@@ -54,9 +83,9 @@ export async function resolveProfile(
 
     stack.add(profileName);
 
-    const current = await loadProfile(
-      profileName
-    );
+    const loaded = await loadProfile(profileName, registryContext);
+    const current = loaded.profile;
+    const currentRegistry = loaded.registry;
 
     let always: string[] = [];
     let pool: string[] = [];
@@ -64,7 +93,11 @@ export async function resolveProfile(
     let maxAutoSkills = 6;
 
     for (const parentName of current.extends ?? []) {
-      const parent = await resolve(parentName);
+      const parent = await resolve(
+        parseRegistryReference(parentName).registry
+          ? parentName
+          : formatRegistryReference(currentRegistry, parentName)
+      );
 
       always.push(...parent.always);
       pool.push(...parent.pool);
@@ -72,8 +105,13 @@ export async function resolveProfile(
       maxAutoSkills = parent.maxAutoSkills;
     }
 
-    always.push(...(current.always ?? []));
-    pool.push(...(current.pool ?? []));
+    const qualify = (id: string): string =>
+      parseRegistryReference(id).registry
+        ? id
+        : formatRegistryReference(currentRegistry, id);
+
+    always.push(...(current.always ?? []).map(qualify));
+    pool.push(...(current.pool ?? []).map(qualify));
 
     if (
       current.policy?.max_auto_skills !== undefined
@@ -91,7 +129,7 @@ export async function resolveProfile(
     );
 
     return {
-      name: profileName,
+      name: formatRegistryReference(currentRegistry, current.name ?? parseRegistryReference(profileName).id),
       always,
       pool,
       maxAutoSkills

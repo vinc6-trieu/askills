@@ -3,8 +3,12 @@ import path from "node:path";
 import YAML from "yaml";
 
 import {
-  skillsRoot
-} from "./paths.js";
+  createRegistryContext
+} from "./registry-config.js";
+
+import type {
+  RegistryContext
+} from "./registry-context.js";
 
 export interface SkillDescriptor {
   id: string;
@@ -14,12 +18,12 @@ export interface SkillDescriptor {
 }
 
 export async function loadSkillDescriptor(
-  id: string
+  id: string,
+  context?: RegistryContext
 ): Promise<SkillDescriptor> {
-  const skillPath = path.join(
-    skillsRoot(),
-    id
-  );
+  const registryContext = context ?? await createRegistryContext();
+  const resolved = await registryContext.resolveSkill(id);
+  const skillPath = resolved.root;
 
   const file = path.join(
     skillPath,
@@ -62,7 +66,7 @@ export async function loadSkillDescriptor(
   }
 
   return {
-    id,
+    id: resolved.reference,
     name: frontmatter.name,
     description: frontmatter.description,
     path: skillPath

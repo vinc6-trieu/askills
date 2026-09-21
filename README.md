@@ -197,20 +197,55 @@ askills setup \
   --registry git@github.com:vinc6-trieu/agent-skills.git
 ```
 
-The registry is cloned to:
+The default registry is cloned to:
 
 ```text
-~/.askills/registry
+~/.askills/registries/default
 ```
+
+### Multiple registries and reproducible projects
+
+Give each registry a short name. Earlier entries have higher precedence for
+unqualified skill and profile IDs:
+
+```bash
+askills setup --name company --registry git@github.com:company/agent-skills.git
+askills setup --name community --registry https://github.com/example/skills.git
+```
+
+The machine configuration is stored in `~/.askills/config.yaml`; its registry
+list is the precedence order. A project can select and order a subset:
+
+```yaml
+version: 1
+profile: company:backend-rust
+registries:
+  - company
+  - community
+```
+
+Use `registry:namespace/skill` whenever you need a specific source, for
+example `community:global/tdd`. An unqualified `global/tdd` resolves to the
+first registry that provides it. `askills list` marks lower-priority duplicate
+skills as `shadowed`.
+
+On bootstrap, askills writes the committed `.agent-skills.lock.yaml` with a
+schema version and exact Git commits. It links skills from immutable cache
+snapshots under `~/.askills/cache/<registry>/<commit>/`; `askills sync` can
+download newer snapshots but never changes an existing project lock.
+Refresh a project deliberately with `askills bootstrap --update-lock`.
 
 Example:
 
 ```text
 ~/.askills/
-└── registry/
-    ├── skills/
-    ├── profiles/
-    └── registry/
+├── config.yaml
+├── registries/
+│   └── default/
+│       ├── skills/
+│       └── profiles/
+└── cache/
+    └── default/<commit>/
 ```
 
 ---
@@ -629,10 +664,32 @@ askills sync
 Equivalent conceptually to updating:
 
 ```text
-~/.askills/registry
+~/.askills/registries/*
 ```
 
 from its Git remote.
+
+## Skill inspection and project overrides
+
+```bash
+askills doctor                 # validate registry roots, lock, and skill metadata
+askills list                   # list all visible skills
+askills search debugging       # search IDs, names, and descriptions
+askills open company:global/tdd
+askills open global/tdd --path
+```
+
+To force a skill into a project's resolved set, or exclude one supplied by a
+profile, update the project config through the CLI:
+
+```bash
+askills add company:domains/security
+askills remove global/tdd
+```
+
+`add` writes a canonical namespaced entry to `skills.include` and removes a
+matching exclusion. `remove` removes a matching include and adds the canonical
+entry to `skills.exclude`.
 
 ---
 
@@ -1136,7 +1193,9 @@ Machine-level state:
 
 ```text
 ~/.askills/
-└── registry/
+├── config.yaml
+├── registries/
+└── cache/
 ```
 
 Project-level configuration:
@@ -1214,7 +1273,8 @@ company-agent-skills
 
 Private Git repositories can use normal SSH authentication.
 
-Support for composing multiple registries is planned.
+Registries can be composed and selected per project; use a qualified ID when a
+project needs a lower-priority duplicate.
 
 ---
 
@@ -1227,7 +1287,7 @@ installed registry.
 
 ```bash
 askills sync
-ls ~/.askills/registry/profiles
+ls ~/.askills/registries/<name>/profiles
 ```
 
 Fix the `profile:` value or run `askills init --auto --force`.
@@ -1238,7 +1298,7 @@ An `include` entry, or a profile pool entry, points at a skill the
 registry does not contain. Check the id against:
 
 ```bash
-ls ~/.askills/registry/skills/<layer>
+ls ~/.askills/registries/<name>/skills/<layer>
 ```
 
 and run `askills sync` if the registry is stale.
@@ -1343,10 +1403,10 @@ askills resolve \
 
 `ASKILLS_REGISTRY_PATH` is intended as a development override.
 
-Normal installations should use:
+Normal installations use:
 
 ```text
-~/.askills/registry
+~/.askills/registries/<name>
 ```
 
 through `askills setup`.
@@ -1410,16 +1470,16 @@ When an agent already supports skill discovery, askills should expose skills in 
 ## Next
 
 * [ ] additional coding-agent adapters
-* [ ] multiple registry support
-* [ ] registry precedence and namespacing
-* [ ] versioned registry locks
-* [ ] immutable skill cache
-* [ ] `askills doctor`
-* [ ] `askills search`
-* [ ] `askills list`
-* [ ] `askills add`
-* [ ] `askills remove`
-* [ ] `askills open`
+* [x] multiple registry support
+* [x] registry precedence and namespacing
+* [x] versioned registry locks
+* [x] immutable skill cache
+* [x] `askills doctor`
+* [x] `askills search`
+* [x] `askills list`
+* [x] `askills add`
+* [x] `askills remove`
+* [x] `askills open`
 * [ ] optional remote registry / MCP integration
 
 ---
@@ -1437,4 +1497,3 @@ For now, it is best suited for experimentation with portable coding-agent skill 
 # License
 
 MIT
-

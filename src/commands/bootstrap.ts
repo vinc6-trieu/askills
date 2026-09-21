@@ -12,8 +12,9 @@ import {
 } from "../core/profile-resolver.js";
 
 import {
-  skillsRoot
-} from "../core/paths.js";
+  createRegistryContext,
+  lockProjectRegistries
+} from "../core/registry-config.js";
 
 import {
   loadSkillMeta
@@ -55,16 +56,11 @@ function flattenId(
 }
 
 async function skillExists(
-  id: string
+  id: string,
+  context: Awaited<ReturnType<typeof createRegistryContext>>
 ): Promise<boolean> {
-  const skillMd = path.join(
-    skillsRoot(),
-    id,
-    "SKILL.md"
-  );
-
   try {
-    await fs.access(skillMd);
+    await fs.access(path.join((await context.resolveSkill(id)).root, "SKILL.md"));
     return true;
   } catch {
     return false;
@@ -158,29 +154,40 @@ async function cleanupGeneratedCodexSkills(
   return codexSkillsRoot;
 }
 
-export async function bootstrapCommand(): Promise<void> {
+export async function bootstrapCommand(
+  options: { updateLock?: boolean } = {}
+): Promise<void> {
   const root = process.cwd();
 
   const config =
     await loadProjectConfig(root);
 
+  await lockProjectRegistries(root, options.updateLock);
+
+  const context = await createRegistryContext(root);
+
   const profile =
     await resolveProfile(
-      config.profile
+      config.profile,
+      context,
+      root
     );
 
   const include =
     config.skills?.include ?? [];
 
-  const exclude =
-    new Set(
-      config.skills?.exclude ?? []
-    );
+  const exclude = new Set(
+    await Promise.all(
+      (config.skills?.exclude ?? []).map(async id =>
+        (await context.resolveSkill(id)).reference
+      )
+    )
+  );
 
   const skillIds = unique([
     ...profile.always,
     ...profile.pool,
-    ...include
+    ...await Promise.all(include.map(async id => (await context.resolveSkill(id)).reference))
   ]).filter(
     id => !exclude.has(id)
   );
@@ -233,18 +240,18 @@ export async function bootstrapCommand(): Promise<void> {
     new Map<string, string>();
 
   for (const id of skillIds) {
-    if (!(await skillExists(id))) {
+    if (!(await skillExists(id, context))) {
       throw new Error(
         `Skill not found in registry: ${id}`
       );
     }
 
     // Validate routing metadata.
-    await loadSkillMeta(id);
+    await loadSkillMeta(id, context);
 
     // Validate SKILL.md + obtain Codex invocation name.
     const descriptor =
-      await loadSkillDescriptor(id);
+      await loadSkillDescriptor(id, context);
 
     const existing =
       skillNames.get(
@@ -309,7 +316,8 @@ export async function bootstrapCommand(): Promise<void> {
   const claude =
     await prepareClaudeSkills(
       skillIds,
-      root
+      root,
+      context
     );
 
   const agentGuides =
@@ -325,8 +333,12 @@ export async function bootstrapCommand(): Promise<void> {
     profile:
       config.profile,
 
-    registry:
-      skillsRoot(),
+    registries:
+      context.registries.map(registry => ({
+        name: registry.name,
+        root: registry.root,
+        commit: registry.commit
+      })),
 
     integrations: {
       codex: {

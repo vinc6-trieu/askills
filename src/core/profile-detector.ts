@@ -6,8 +6,8 @@ import {
 } from "./repo-detector.js";
 
 import {
-  profilesRoot
-} from "./paths.js";
+  createRegistryContext
+} from "./registry-config.js";
 
 import type {
   RepoContext
@@ -16,20 +16,31 @@ import type {
 const FALLBACK_PROFILE = "coding";
 
 async function profileExists(
-  name: string
+  name: string,
+  root: string
 ): Promise<boolean> {
-  try {
-    await fs.access(
-      path.join(
-        profilesRoot(),
-        `${name}.yaml`
-      )
-    );
+  let context;
 
-    return true;
-  } catch {
-    return false;
+  try {
+    context = await createRegistryContext(root, { useLock: false });
+  } catch (error) {
+    if (error instanceof Error && error.message === "No skill registries are configured.") {
+      return false;
+    }
+
+    throw error;
   }
+
+  for (const registry of context.registries) {
+    try {
+      await fs.access(path.join(registry.root, "profiles", `${name}.yaml`));
+      return true;
+    } catch {
+      // Try the next registry in precedence order.
+    }
+  }
+
+  return false;
 }
 
 function profileForLanguage(
@@ -160,7 +171,7 @@ export async function detectProfile(
    * so bootstrap does not fail later with
    * "Profile not found".
    */
-  if (await profileExists(candidate)) {
+  if (await profileExists(candidate, root)) {
     return candidate;
   }
 

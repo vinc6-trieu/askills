@@ -11,6 +11,10 @@ import {
   writeAskillsLocalExcludes
 } from "./git-exclude.js";
 
+import type {
+  RegistryContext
+} from "./registry-context.js";
+
 interface ClaudeSkillState {
   version: number;
   generated: string[];
@@ -74,7 +78,8 @@ async function loadPreviousState(
 
 export async function prepareClaudeSkills(
   ids: string[],
-  root = process.cwd()
+  root = process.cwd(),
+  context?: RegistryContext
 ): Promise<ClaudeSkillResult> {
   const runtimeRoot = path.join(
     root,
@@ -139,7 +144,7 @@ export async function prepareClaudeSkills(
 
   for (const id of [...new Set(ids)]) {
     const descriptor =
-      await loadSkillDescriptor(id);
+      await loadSkillDescriptor(id, context);
 
     const name =
       descriptor.name.trim();

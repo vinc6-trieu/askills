@@ -2,6 +2,10 @@ import { resolveProfile } from "./profile-resolver.js";
 
 import { loadSkillMetas } from "./skill-registry.js";
 
+import { createRegistryContext } from "./registry-config.js";
+
+import type { RegistryContext } from "./registry-context.js";
+
 import { detectRepository } from "./repo-detector.js";
 
 import type {
@@ -192,26 +196,35 @@ export async function resolveSkills(
   profileName: string,
   root = process.cwd(),
   overrides: ResolveOverrides = {},
+  context?: RegistryContext
 ): Promise<ResolveResult> {
-  const profile = await resolveProfile(profileName);
+  const registryContext = context ?? await createRegistryContext(root);
+  const profile = await resolveProfile(profileName, registryContext, root);
 
   const repo = await detectRepository(root);
 
   const query = buildQuery(task);
 
-  const excluded = new Set(overrides.exclude ?? []);
+  const normalizeIds = async (ids: string[]): Promise<string[]> =>
+    Promise.all(ids.map(async id =>
+      (await registryContext.resolveSkill(id)).reference
+    ));
+
+  const normalizedExclude = await normalizeIds(overrides.exclude ?? []);
+  const normalizedInclude = await normalizeIds(overrides.include ?? []);
+  const excluded = new Set(normalizedExclude);
 
   const forced = new Set(
-    (overrides.include ?? []).filter((id) => !excluded.has(id)),
+    normalizedInclude.filter((id) => !excluded.has(id)),
   );
 
   const always = profile.always.filter((id) => !excluded.has(id));
 
   const candidatePool = [
-    ...new Set([...profile.pool, ...(overrides.include ?? [])]),
+    ...new Set([...profile.pool, ...normalizedInclude]),
   ].filter((id) => !excluded.has(id) && !always.includes(id));
 
-  const metas = await loadSkillMetas(candidatePool);
+  const metas = await loadSkillMetas(candidatePool, registryContext);
 
   const scored: ScoredSkill[] = [];
 

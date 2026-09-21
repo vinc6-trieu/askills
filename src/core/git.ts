@@ -38,3 +38,25 @@ export async function runGit(
     }
   );
 }
+
+export async function runGitOutput(
+  args: string[]
+): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const child = spawn("git", args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", chunk => { stdout += String(chunk); });
+    child.stderr.on("data", chunk => { stderr += String(chunk); });
+    child.on("error", reject);
+    child.on("exit", code => {
+      if (code === 0) {
+        resolve(stdout.trim());
+        return;
+      }
+
+      reject(new Error(`git ${args.join(" ")} failed: ${stderr.trim() || `exit ${code}`}`));
+    });
+  });
+}

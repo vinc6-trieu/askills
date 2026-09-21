@@ -35,6 +35,15 @@ import {
   runCommand
 } from "./commands/run.js";
 
+import {
+  addCommand,
+  doctorCommand,
+  listCommand,
+  openCommand,
+  removeCommand,
+  searchCommand
+} from "./commands/skills.js";
+
 const program = new Command();
 
 program
@@ -53,6 +62,8 @@ program
     "--registry <url>",
     "Git repository containing agent skills"
   )
+  .option("--name <name>", "Registry name (default: default)")
+  .option("--ref <ref>", "Branch or tag to clone")
   .action(async options => {
     await setupCommand(options);
   });
@@ -64,6 +75,37 @@ program
   )
   .action(async () => {
     await syncCommand();
+  });
+
+program.command("doctor")
+  .description("Validate registry, lock, and skill metadata")
+  .action(async () => { await doctorCommand(); });
+
+program.command("list")
+  .description("List skills from configured registries")
+  .action(async () => { await listCommand(); });
+
+program.command("search")
+  .description("Search skill names and descriptions")
+  .argument("<query>", "Search query")
+  .action(async (query: string) => { await searchCommand(query); });
+
+program.command("add")
+  .description("Force-include a skill in the current project")
+  .argument("<skill>", "Skill ID, optionally registry:skill")
+  .action(async (skill: string) => { await addCommand(skill); });
+
+program.command("remove")
+  .description("Exclude a skill from the current project")
+  .argument("<skill>", "Skill ID, optionally registry:skill")
+  .action(async (skill: string) => { await removeCommand(skill); });
+
+program.command("open")
+  .description("Print a skill's SKILL.md")
+  .argument("<skill>", "Skill ID, optionally registry:skill")
+  .option("--path", "Print the resolved SKILL.md path only")
+  .action(async (skill: string, options: { path?: boolean }) => {
+    await openCommand(skill, options);
   });
 
 program
@@ -92,8 +134,9 @@ program
   .description(
     "Prepare the project skill pool"
   )
-  .action(async () => {
-    await bootstrapCommand();
+  .option("--update-lock", "Refresh the project registry lock to current commits")
+  .action(async (options: { updateLock?: boolean }) => {
+    await bootstrapCommand(options);
   });
 
 program

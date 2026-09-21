@@ -7,6 +7,10 @@ import {
   type SkillDescriptor
 } from "./skill-frontmatter.js";
 
+import type {
+  RegistryContext
+} from "./registry-context.js";
+
 function flattenId(
   id: string
 ): string {
@@ -46,7 +50,8 @@ async function linkDirectory(
 
 export async function materializeActiveSkills(
   ids: string[],
-  root = process.cwd()
+  root = process.cwd(),
+  context?: RegistryContext
 ): Promise<SkillDescriptor[]> {
   const runtimeRoot =
     path.join(
@@ -85,7 +90,7 @@ export async function materializeActiveSkills(
     const id of [...new Set(ids)]
   ) {
     const descriptor =
-      await loadSkillDescriptor(id);
+      await loadSkillDescriptor(id, context);
 
     const existing =
       names.get(

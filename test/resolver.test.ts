@@ -37,7 +37,7 @@ test("a matching language signal selects the language skill", async () => {
   );
 
   assert.ok(
-    result.selected.map(s => s.id).includes("languages/rust")
+    result.selected.map(s => s.id).includes("default:languages/rust")
   );
 });
 
@@ -52,7 +52,7 @@ test("forced include bypasses the score threshold", async () => {
   );
 
   const forced = result.selected.find(
-    s => s.id === "domains/event-driven"
+    s => s.id === "default:domains/event-driven"
   );
 
   assert.ok(forced, "forced include should be selected");
@@ -72,7 +72,7 @@ test("exclude drops an always skill", async () => {
   );
 
   assert.ok(
-    !result.always.includes("global/systematic-debugging")
+    !result.always.includes("default:global/systematic-debugging")
   );
 });
 
@@ -84,11 +84,11 @@ test("auto:false skills are never auto-selected", async () => {
   );
 
   assert.ok(
-    !result.selected.map(s => s.id).includes("meta/noauto")
+    !result.selected.map(s => s.id).includes("default:meta/noauto")
   );
 
   const candidate = result.candidates.find(
-    c => c.id === "meta/noauto"
+    c => c.id === "default:meta/noauto"
   );
 
   assert.equal(candidate?.rejection, "auto: false");
@@ -102,7 +102,7 @@ test("candidates carry a rejection reason", async () => {
   );
 
   const evd = result.candidates.find(
-    c => c.id === "domains/event-driven"
+    c => c.id === "default:domains/event-driven"
   );
 
   assert.ok(evd);

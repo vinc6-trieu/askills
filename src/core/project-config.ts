@@ -7,6 +7,9 @@ export interface ProjectConfig {
 
   profile: string;
 
+  /* Registry names in decreasing precedence order. */
+  registries?: string[];
+
   skills?: {
     include?: string[];
     exclude?: string[];

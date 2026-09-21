@@ -3,21 +3,24 @@ import path from "node:path";
 import YAML from "yaml";
 
 import {
-  skillsRoot
-} from "./paths.js";
+  createRegistryContext
+} from "./registry-config.js";
+
+import type {
+  RegistryContext
+} from "./registry-context.js";
 
 import type {
   SkillMeta
 } from "./types.js";
 
 export async function loadSkillMeta(
-  id: string
+  id: string,
+  context?: RegistryContext
 ): Promise<SkillMeta> {
-  const file = path.join(
-    skillsRoot(),
-    id,
-    "skill.meta.yaml"
-  );
+  const registryContext = context ?? await createRegistryContext();
+  const resolved = await registryContext.resolveSkill(id);
+  const file = path.join(resolved.root, "skill.meta.yaml");
 
   try {
     const raw = await fs.readFile(
@@ -29,7 +32,9 @@ export async function loadSkillMeta(
       YAML.parse(raw) as SkillMeta;
 
     if (!meta.id) {
-      meta.id = id;
+      meta.id = resolved.reference;
+    } else {
+      meta.id = resolved.reference;
     }
 
     return meta;
@@ -50,7 +55,8 @@ export async function loadSkillMeta(
  * loadSkillMeta.
  */
 export async function loadSkillMetas(
-  ids: string[]
+  ids: string[],
+  context?: RegistryContext
 ): Promise<Map<string, SkillMeta>> {
 
   const result =
@@ -60,7 +66,7 @@ export async function loadSkillMetas(
     try {
       result.set(
         id,
-        await loadSkillMeta(id)
+        await loadSkillMeta(id, context)
       );
     } catch (error) {
       console.warn(
