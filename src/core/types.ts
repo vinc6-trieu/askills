@@ -106,6 +106,8 @@ export interface ScoredSkill {
 export interface ResolveResult {
   profile: ResolvedProfile;
 
+  profiles: string[];
+
   repo: RepoContext;
 
   always: string[];

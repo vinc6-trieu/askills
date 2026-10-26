@@ -1,0 +1,23 @@
+{
+  "profiles": {
+    "coding": {"name":"coding","pool":["global/debugging","global/tdd","languages/rust","frameworks/target","domains/database"],"policy":{"max_auto_skills":4}},
+    "crowded": {"name":"crowded","pool":["process/a","process/b","domain/a","domain/b","frameworks/target"],"policy":{"max_auto_skills":4}},
+    "workflow": {"name":"workflow","pool":["global/debugging","global/tdd","domain/a","domain/b","frameworks/target","frameworks/other"],"policy":{"max_auto_skills":4}},
+    "quality": {"name":"quality","pool":["quality/a","quality/b","quality/c"],"policy":{"max_auto_skills":3}}
+  },
+  "skills": [
+    {"id":"global/debugging","kind":"process","intents":["bugfix","sửa lỗi"],"keywords":["bug","lỗi"],"priority":90},
+    {"id":"global/tdd","kind":"quality","intents":["test","kiểm thử"],"keywords":["test","hồi quy"],"priority":85},
+    {"id":"languages/rust","kind":"language","languages":["rust"],"priority":50},
+    {"id":"domains/database","kind":"domain","keywords":["cơ sở dữ liệu","truy vấn"],"priority":80},
+    {"id":"process/a","kind":"process","keywords":["fix","bug"]},
+    {"id":"process/b","kind":"process","keywords":["fix","bug"]},
+    {"id":"domain/a","kind":"domain","intents":["schema","query","index"]},
+    {"id":"domain/b","kind":"domain","intents":["schema","query","index"]},
+    {"id":"frameworks/target","kind":"framework","intents":["schema","query","index"]},
+    {"id":"frameworks/other","kind":"framework","intents":["schema","query","index"]},
+    {"id":"quality/a","kind":"quality","intents":["verify"]},
+    {"id":"quality/b","kind":"quality","intents":["verify"]},
+    {"id":"quality/c","kind":"quality","intents":["verify"]}
+  ]
+}

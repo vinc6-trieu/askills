@@ -7,6 +7,7 @@ import { createRegistryContext } from "./registry-config.js";
 import type { RegistryContext } from "./registry-context.js";
 
 import { detectRepository } from "./repo-detector.js";
+import { scopedRepository, taskPaths } from "./task-scope.js";
 
 import type {
   ResolveResult,
@@ -23,7 +24,7 @@ interface TaskQuery {
 }
 
 function normalize(value: string): string {
-  return value.toLowerCase().trim();
+  return value.normalize("NFC").toLowerCase().trim().replace(/\s+/gu, " ");
 }
 
 function escapeRegExp(value: string): string {
@@ -33,7 +34,7 @@ function escapeRegExp(value: string): string {
 function tokenize(value: string): Set<string> {
   return new Set(
     normalize(value)
-      .split(/[^a-z0-9#+.]+/)
+      .split(/[^\p{L}\p{M}\p{N}#+.]+/u)
       .filter(Boolean),
   );
 }
@@ -63,7 +64,8 @@ export function matchesTerm(query: TaskQuery, term: string): boolean {
 
   if (/[\s\-/]/.test(needle)) {
     const pattern = new RegExp(
-      `(^|[^a-z0-9])${escapeRegExp(needle)}([^a-z0-9]|$)`,
+      `(^|[^\\p{L}\\p{M}\\p{N}_])${escapeRegExp(needle)}([^\\p{L}\\p{M}\\p{N}_]|$)`,
+      "u",
     );
 
     return pattern.test(query.text);
@@ -168,7 +170,7 @@ function scoreSkill(
   };
 }
 
-const SLOT_LIMITS: Partial<Record<SkillKind, number>> = {
+const SOFT_LIMITS: Record<SkillKind, number> = {
   process: 2,
   domain: 2,
   language: 1,
@@ -177,31 +179,34 @@ const SLOT_LIMITS: Partial<Record<SkillKind, number>> = {
   meta: 0,
 };
 
-const KIND_ORDER: SkillKind[] = [
-  "process",
-  "domain",
-  "language",
-  "framework",
-  "quality",
-  "meta",
-];
-
 export interface ResolveOverrides {
+  pool?: string[];
   include?: string[];
   exclude?: string[];
+  skills?: string[];
+  paths?: string[];
 }
 
 export async function resolveSkills(
   task: string,
-  profileName: string,
+  profileName: string | string[],
   root = process.cwd(),
   overrides: ResolveOverrides = {},
   context?: RegistryContext
 ): Promise<ResolveResult> {
   const registryContext = context ?? await createRegistryContext(root);
-  const profile = await resolveProfile(profileName, registryContext, root);
+  const resolvedProfiles = await Promise.all([...new Set(typeof profileName === "string" ? [profileName] : profileName)]
+    .map(name => resolveProfile(name, registryContext, root)));
+  const profiles = [...new Map(resolvedProfiles.map(profile => [profile.name, profile])).values()];
+  if (profiles.length === 0) throw new Error("At least one profile is required");
+  const profile = {
+    name: profiles.map(p => p.name).join(" + "),
+    always: [...new Set(profiles.flatMap(p => p.always))],
+    pool: [...new Set(profiles.flatMap(p => p.pool))],
+    maxAutoSkills: Math.min(...profiles.map(p => p.maxAutoSkills))
+  };
 
-  const repo = await detectRepository(root);
+  const repo = await scopedRepository(root, await taskPaths(root, overrides.paths ?? []));
 
   const query = buildQuery(task);
 
@@ -212,19 +217,28 @@ export async function resolveSkills(
 
   const normalizedExclude = await normalizeIds(overrides.exclude ?? []);
   const normalizedInclude = await normalizeIds(overrides.include ?? []);
+  const normalizedPool = await normalizeIds(overrides.pool ?? []);
+  const requested = await normalizeIds(overrides.skills ?? []);
   const excluded = new Set(normalizedExclude);
 
+  for (const id of requested) {
+    if (excluded.has(id)) throw new Error(`Explicit skill "${id}" is excluded by project configuration`);
+  }
+
   const forced = new Set(
-    normalizedInclude.filter((id) => !excluded.has(id)),
+    [...normalizedInclude, ...requested].filter((id) => !excluded.has(id)),
   );
 
   const always = profile.always.filter((id) => !excluded.has(id));
 
   const candidatePool = [
-    ...new Set([...profile.pool, ...normalizedInclude]),
+    ...new Set([...profile.pool, ...normalizedPool, ...normalizedInclude, ...requested]),
   ].filter((id) => !excluded.has(id) && !always.includes(id));
 
   const metas = await loadSkillMetas(candidatePool, registryContext);
+  for (const id of forced) {
+    if (!always.includes(id) && !metas.has(id)) throw new Error(`Cannot load metadata for required skill "${id}"`);
+  }
 
   const scored: ScoredSkill[] = [];
 
@@ -247,7 +261,22 @@ export async function resolveSkills(
       a.id.localeCompare(b.id),
   );
 
-  const selectable = scored.filter((item) => item.rejection === undefined);
+  const selectable = scored.filter((item) => {
+    if (item.rejection) return false;
+    if (item.score < SCORE_THRESHOLD) {
+      item.rejection = `score ${item.score.toFixed(1)} < ${SCORE_THRESHOLD}`;
+      return false;
+    }
+    if (item.kind === "meta") {
+      item.rejection = 'category "meta" is not auto-selected';
+      return false;
+    }
+    if (!Object.hasOwn(SOFT_LIMITS, item.kind)) {
+      item.rejection = `unknown category "${item.kind}"`;
+      return false;
+    }
+    return true;
+  });
 
   const selected: ScoredSkill[] = [];
 
@@ -255,41 +284,36 @@ export async function resolveSkills(
 
   const countByKind = new Map<SkillKind, number>();
 
-  for (const kind of KIND_ORDER) {
-    const limit = SLOT_LIMITS[kind] ?? 0;
+  function select(candidate: ScoredSkill): void {
+    if (selectedIds.has(candidate.id) || selected.length >= profile.maxAutoSkills) return;
+    candidate.selected = true;
+    selected.push(candidate);
+    selectedIds.add(candidate.id);
+    countByKind.set(candidate.kind, (countByKind.get(candidate.kind) ?? 0) + 1);
+  }
 
-    const candidates = selectable.filter((item) => item.kind === kind);
+  // Explicit names in the task get first use of the automatic budget.
+  for (const candidate of selectable.filter(item => item.reasons.includes("explicit skill match"))) select(candidate);
 
-    for (const candidate of candidates) {
-      if (candidate.score < SCORE_THRESHOLD) {
-        candidate.rejection =
-          `score ${candidate.score.toFixed(1)} < ${SCORE_THRESHOLD}`;
-        continue;
-      }
+  // Reserve at most one process and one quality slot, only with task evidence.
+  // TDD is quality in the registry. Repository signals alone cannot earn a floor.
+  const floors = ["process", "quality"].flatMap(kind => {
+    if ((countByKind.get(kind as SkillKind) ?? 0) > 0) return [];
+    const candidate = selectable.find(item => item.kind === kind && item.reasons.some(reason =>
+      reason.startsWith("intent:") || reason.startsWith("keyword:")
+    ));
+    return candidate ? [candidate] : [];
+  }).sort((a, b) => b.score - a.score || b.priority - a.priority || a.id.localeCompare(b.id));
+  for (const candidate of floors) select(candidate);
 
-      if (limit <= 0) {
-        candidate.rejection = `category "${kind}" is not auto-selected`;
-        continue;
-      }
-
-      const current = countByKind.get(kind) ?? 0;
-
-      if (current >= limit) {
-        candidate.rejection = `category "${kind}" limit ${limit} reached`;
-        continue;
-      }
-
-      if (selected.length >= profile.maxAutoSkills) {
-        candidate.rejection =
-          `max_auto_skills ${profile.maxAutoSkills} reached`;
-        continue;
-      }
-
-      candidate.selected = true;
-      selected.push(candidate);
-      selectedIds.add(candidate.id);
-      countByKind.set(kind, current + 1);
-    }
+  // Global rank, with soft category ceilings for diversity.
+  for (const candidate of selectable) {
+    if ((countByKind.get(candidate.kind) ?? 0) < SOFT_LIMITS[candidate.kind]) select(candidate);
+  }
+  // Do not leave useful slots empty just because a soft ceiling was reached.
+  for (const candidate of selectable) select(candidate);
+  for (const candidate of selectable) {
+    if (!candidate.selected) candidate.rejection = `max_auto_skills ${profile.maxAutoSkills} reached`;
   }
 
   /*
@@ -298,7 +322,7 @@ export async function resolveSkills(
    * the category / max_auto_skills limits.
    */
   for (const id of forced) {
-    if (selectedIds.has(id) || always.includes(id)) {
+    if (always.includes(id)) {
       continue;
     }
 
@@ -310,14 +334,17 @@ export async function resolveSkills(
 
     item.selected = true;
     item.rejection = undefined;
-    item.reasons.unshift("config include (forced)");
+    item.reasons.unshift(requested.includes(id) ? "CLI skill (forced)" : "config include (forced)");
 
-    selected.push(item);
-    selectedIds.add(id);
+    if (!selectedIds.has(id)) {
+      selected.push(item);
+      selectedIds.add(id);
+    }
   }
 
   return {
     profile,
+    profiles: profiles.map(p => p.name),
     repo,
     always,
     selected,

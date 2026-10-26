@@ -1,12 +1,13 @@
 import {
   projectConfigExists,
-  loadProjectConfig,
   type ProjectConfig
 } from "./project-config.js";
 
 import {
-  resolveSkills
-} from "./skill-resolver.js";
+  resolveTask, type RoutingOptions
+} from "./task-routing.js";
+import { lockProjectRegistries } from "./registry-config.js";
+import { loadSkillDescriptor } from "./skill-frontmatter.js";
 
 import {
   materializeActiveSkills
@@ -38,38 +39,24 @@ export interface PreparedAgentTask {
   resolution: ResolveResult;
 
   activeSkills: SkillDescriptor[];
+
+  paths: string[];
 }
 
 export async function prepareAgentTask(
   task: string,
-  root = process.cwd()
+  root = process.cwd(),
+  options: RoutingOptions & { dryRun?: boolean } = {}
 ): Promise<PreparedAgentTask> {
-  if (
-    !(await projectConfigExists(root))
-  ) {
-    await initCommand({
-      auto: true
-    });
+  // Validate and preview without touching config, caches, guides, or links.
+  let routed = await resolveTask(task, root, options);
+  if (!options.dryRun) {
+    if (!(await projectConfigExists(root))) await initCommand({ auto: true }, root);
+    await lockProjectRegistries(root);
+    // Use exactly the locked snapshot for both selection and materialization.
+    routed = await resolveTask(task, root, options);
   }
-
-  await bootstrapCommand();
-
-  const config =
-    await loadProjectConfig(root);
-
-  const resolution =
-    await resolveSkills(
-      task,
-      config.profile,
-      root,
-      {
-        include:
-          config.skills?.include ?? [],
-
-        exclude:
-          config.skills?.exclude ?? []
-      }
-    );
+  const { config, resolution, context } = routed;
 
   const ids = [
     ...new Set([
@@ -81,17 +68,20 @@ export async function prepareAgentTask(
     ])
   ];
 
-  const activeSkills =
-    await materializeActiveSkills(
-      ids,
-      root
-    );
+  let activeSkills: SkillDescriptor[];
+  if (options.dryRun) {
+    activeSkills = await Promise.all(ids.map(id => loadSkillDescriptor(id, context)));
+  } else {
+    await bootstrapCommand({ root, extraSkills: ids });
+    activeSkills = await materializeActiveSkills(ids, root, context);
+  }
 
   return {
     root,
     task,
     config,
     resolution,
-    activeSkills
+    activeSkills,
+    paths: routed.paths
   };
 }

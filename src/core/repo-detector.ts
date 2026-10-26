@@ -636,7 +636,7 @@ async function collectRootExtras(
   }
 }
 
-async function hasManifest(dir: string): Promise<boolean> {
+export async function hasManifest(dir: string): Promise<boolean> {
   for (const manifest of SUBPROJECT_MANIFESTS) {
     if (await exists(path.join(dir, manifest))) {
       return true;

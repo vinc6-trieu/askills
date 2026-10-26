@@ -120,6 +120,10 @@ export async function resolveProfile(
         current.policy.max_auto_skills;
     }
 
+    if (!Number.isInteger(maxAutoSkills) || maxAutoSkills < 0) {
+      throw new Error(`Invalid max_auto_skills in profile "${profileName}": expected a non-negative integer`);
+    }
+
     stack.delete(profileName);
 
     always = unique(always);

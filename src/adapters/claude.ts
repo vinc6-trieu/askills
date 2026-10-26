@@ -7,6 +7,7 @@ import type {
 import type {
   PreparedAgentTask
 } from "../core/agent-task.js";
+import { routingContext } from "./routing-context.js";
 
 export const claudeAdapter:
   AgentAdapter = {
@@ -26,6 +27,7 @@ export const claudeAdapter:
   ): AgentInvocation {
 
     const routingHint = [
+      routingContext(prepared),
       "askills has identified the following project skills",
       "as especially relevant to this task:",
       "",

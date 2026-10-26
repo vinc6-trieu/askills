@@ -1,0 +1,11 @@
+[
+  {"id":"rust-debug-test","task":"fix panic bug and add regression tests","profile":"backend-rust","repo":"rust-axum","must":["global/systematic-debugging","global/tdd","languages/rust"]},
+  {"id":"rust-explicit-review","task":"use global/code-review to review SQL query transaction migration changes","profile":"backend-rust","repo":"rust-axum","must":["global/code-review","domains/database"]},
+  {"id":"typescript-debug-test","task":"fix timeout bug and add regression tests","profile":"backend-typescript","repo":"ts-node","must":["global/systematic-debugging","global/tdd"]},
+  {"id":"typescript-redis","task":"use frameworks/redis to fix cache TTL timeout bug and add tests","profile":"backend-typescript","repo":"ts-node","must":["frameworks/redis","global/systematic-debugging","global/tdd"]},
+  {"id":"frontend-review","task":"review React component and Next.js server component performance","profile":"frontend-nextjs","repo":"monorepo","must":["global/code-review","frameworks/react","frameworks/nextjs"]},
+  {"id":"forced-legacy","task":"write documentation","profile":"coding","repo":"ts-node","overrides":{"include":["domains/database"]},"must":["domains/database"]},
+  {"id":"vi-registry-vocabulary","task":"sửa lỗi và thêm kiểm thử hồi quy","profile":"backend-rust","repo":"rust-axum","must":["global/systematic-debugging","global/tdd"],"diagnostic":true},
+  {"id":"documentation-only","task":"write documentation only, do not change code","profile":"backend-rust","repo":"rust-axum","mustNot":["languages/rust","frameworks/axum","frameworks/sqlx"],"diagnostic":true},
+  {"id":"negated-testing","task":"explain the API; do not add tests or fix bugs","profile":"backend-typescript","repo":"ts-node","mustNot":["global/tdd","global/systematic-debugging"],"diagnostic":true}
+]

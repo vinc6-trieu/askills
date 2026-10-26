@@ -1,0 +1,149 @@
+{
+  "suite": "real-registry",
+  "registryFingerprint": "dc4d5e6c82df99b297cd5133fb7bd463e28c8566fdd5fdd613819573a63c7c49",
+  "total": 9,
+  "passed": 6,
+  "required": {
+    "total": 6,
+    "passed": 6
+  },
+  "results": [
+    {
+      "id": "rust-debug-test",
+      "diagnostic": false,
+      "selected": [
+        "global/engineering-discipline",
+        "global/systematic-debugging",
+        "global/tdd",
+        "frameworks/axum",
+        "languages/rust",
+        "frameworks/sqlx",
+        "frameworks/kafka"
+      ],
+      "failures": [],
+      "pass": true
+    },
+    {
+      "id": "rust-explicit-review",
+      "diagnostic": false,
+      "selected": [
+        "global/engineering-discipline",
+        "languages/sql",
+        "global/code-review",
+        "global/concise-engineering-output",
+        "domains/database",
+        "frameworks/axum",
+        "frameworks/sqlx"
+      ],
+      "failures": [],
+      "pass": true
+    },
+    {
+      "id": "typescript-debug-test",
+      "diagnostic": false,
+      "selected": [
+        "global/engineering-discipline",
+        "global/systematic-debugging",
+        "global/tdd",
+        "languages/typescript",
+        "frameworks/nestjs",
+        "frameworks/kafka",
+        "domains/distributed-systems"
+      ],
+      "failures": [],
+      "pass": true
+    },
+    {
+      "id": "typescript-redis",
+      "diagnostic": false,
+      "selected": [
+        "global/engineering-discipline",
+        "frameworks/redis",
+        "global/tdd",
+        "global/systematic-debugging",
+        "domains/caching",
+        "languages/typescript",
+        "frameworks/nestjs"
+      ],
+      "failures": [],
+      "pass": true
+    },
+    {
+      "id": "frontend-review",
+      "diagnostic": false,
+      "selected": [
+        "global/engineering-discipline",
+        "frameworks/react",
+        "domains/performance",
+        "global/code-review",
+        "global/concise-engineering-output",
+        "frameworks/nextjs",
+        "languages/typescript"
+      ],
+      "failures": [],
+      "pass": true
+    },
+    {
+      "id": "forced-legacy",
+      "diagnostic": false,
+      "selected": [
+        "global/engineering-discipline",
+        "domains/database"
+      ],
+      "failures": [],
+      "pass": true
+    },
+    {
+      "id": "vi-registry-vocabulary",
+      "diagnostic": true,
+      "selected": [
+        "global/engineering-discipline",
+        "frameworks/axum",
+        "languages/rust",
+        "frameworks/sqlx",
+        "frameworks/kafka",
+        "frameworks/redis"
+      ],
+      "failures": [
+        "missing: global/systematic-debugging",
+        "missing: global/tdd"
+      ],
+      "pass": false
+    },
+    {
+      "id": "documentation-only",
+      "diagnostic": true,
+      "selected": [
+        "global/engineering-discipline",
+        "frameworks/axum",
+        "languages/rust",
+        "frameworks/sqlx",
+        "frameworks/kafka",
+        "frameworks/redis"
+      ],
+      "failures": [
+        "unexpected: languages/rust",
+        "unexpected: frameworks/axum",
+        "unexpected: frameworks/sqlx"
+      ],
+      "pass": false
+    },
+    {
+      "id": "negated-testing",
+      "diagnostic": true,
+      "selected": [
+        "global/engineering-discipline",
+        "global/tdd",
+        "global/technical-research",
+        "frameworks/nestjs",
+        "languages/typescript",
+        "domains/backend-api",
+        "frameworks/kafka"
+      ],
+      "failures": [
+        "unexpected: global/tdd"
+      ],
+      "pass": false
+    }
+  ]
+}

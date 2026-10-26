@@ -33,6 +33,10 @@ Without a shared layer, teams often end up with:
 
 `askills` keeps the actual skills in one Git-backed registry and gives each project only a small configuration file.
 
+For per-task profile/path overrides, Unicode matching, selection policy,
+and migrating forced includes into optional candidates, see
+[Task routing](docs/task-routing.md).
+
 A project can therefore declare:
 
 ```yaml
@@ -679,17 +683,20 @@ askills open company:global/tdd
 askills open global/tdd --path
 ```
 
-To force a skill into a project's resolved set, or exclude one supplied by a
-profile, update the project config through the CLI:
+To force a skill into a project's resolved set, add an optional candidate,
+or exclude one supplied by a profile, update the config through the CLI:
 
 ```bash
 askills add company:domains/security
+askills add domains/database --pool
 askills remove global/tdd
 ```
 
 `add` writes a canonical namespaced entry to `skills.include` and removes a
 matching exclusion. `remove` removes a matching include and adds the canonical
 entry to `skills.exclude`.
+With `--pool`, `add` puts the skill in `skills.pool` and removes its forced
+include entry instead. `remove` also removes explicit pool entries.
 
 ---
 
@@ -765,8 +772,11 @@ askills resolve \
   --profile backend-rust
 ```
 
-When `.agent-skills.yaml` exists, its `profile`, `include`, and `exclude`
-are used automatically. `--profile` overrides the profile.
+When `.agent-skills.yaml` exists, its default profile, path mappings, pool,
+include, and exclude are used automatically. `--profile` overrides profile
+selection for this invocation. Repeat `--path` to scope the task to packages,
+and `--skill` to require individual skills. These same options are available
+on `codex`, `claude`, and `run`.
 
 See why a skill was or was not picked:
 
@@ -775,7 +785,7 @@ askills resolve "<task>" --verbose
 ```
 
 `--verbose` lists every scored candidate with its score and the reason
-it was rejected (below threshold, category limit, `max_auto_skills`,
+it was rejected (below threshold, automatic-selection policy, `max_auto_skills`,
 `auto: false`).
 
 ---
@@ -866,6 +876,11 @@ active in this project regardless of the task wording.
 
 `exclude` removes inherited or profile-provided skills, including
 `always` skills.
+
+`pool` adds optional candidates without forcing them. Existing `include`
+entries retain their behavior; move individual entries explicitly with
+`askills add <skill> --pool`. See [Task routing](docs/task-routing.md) for
+path-based profiles and migration examples.
 
 `agent_instructions` controls the askills-managed block in `CLAUDE.md`
 and `AGENTS.md`. It defaults to `true`; set it to `false` to keep those
@@ -1055,7 +1070,10 @@ repository files
 skill priority
 ```
 
-Skills are also constrained by category limits so one class of skill does not dominate the selection.
+Selection uses global score order, task-supported process/quality reservations,
+and soft category ceilings. Remaining capacity can exceed those ceilings;
+`max_auto_skills` remains the automatic budget. Explicit include/CLI skill
+requirements can exceed it. See [the exact selection order](docs/task-routing.md#selection-order).
 
 Typical target:
 
@@ -1325,8 +1343,8 @@ enable Developer Mode.
 
 ### The resolver selected fewer skills than expected
 
-Selection is capped by `policy.max_auto_skills` and by per-category
-limits, and a skill only counts once its score clears the threshold.
+Selection is capped by `policy.max_auto_skills`; per-category ceilings are soft.
+A skill must clear the score threshold unless explicitly forced.
 Inspect the scoring with:
 
 ```bash

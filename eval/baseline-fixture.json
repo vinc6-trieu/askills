@@ -1,0 +1,131 @@
+{
+  "suite": "fixture",
+  "registryFingerprint": "9c3ccc297d352955ed280072e25ff46f33b10d80f7d4712b1c200c8611dc0d3c",
+  "total": 12,
+  "passed": 6,
+  "required": {
+    "total": 12,
+    "passed": 6
+  },
+  "results": [
+    {
+      "id": "vi-single-word",
+      "diagnostic": false,
+      "selected": [],
+      "failures": [
+        "missing: global/debugging"
+      ],
+      "pass": false
+    },
+    {
+      "id": "vi-compound",
+      "diagnostic": false,
+      "selected": [
+        "global/debugging",
+        "global/tdd"
+      ],
+      "failures": [],
+      "pass": true
+    },
+    {
+      "id": "vi-decomposed",
+      "diagnostic": false,
+      "selected": [],
+      "failures": [
+        "missing: global/debugging",
+        "missing: global/tdd"
+      ],
+      "pass": false
+    },
+    {
+      "id": "vi-whitespace",
+      "diagnostic": false,
+      "selected": [],
+      "failures": [
+        "missing: global/debugging",
+        "missing: global/tdd"
+      ],
+      "pass": false
+    },
+    {
+      "id": "vi-phrase-boundary",
+      "diagnostic": false,
+      "selected": [],
+      "failures": [],
+      "pass": true
+    },
+    {
+      "id": "english-tests",
+      "diagnostic": false,
+      "selected": [
+        "global/debugging",
+        "global/tdd"
+      ],
+      "failures": [],
+      "pass": true
+    },
+    {
+      "id": "explicit-over-category-order",
+      "diagnostic": false,
+      "selected": [
+        "process/a",
+        "process/b",
+        "domain/a",
+        "domain/b"
+      ],
+      "failures": [
+        "missing: frameworks/target"
+      ],
+      "pass": false
+    },
+    {
+      "id": "workflow-floor",
+      "diagnostic": false,
+      "selected": [
+        "global/debugging",
+        "domain/a",
+        "domain/b",
+        "frameworks/other"
+      ],
+      "failures": [
+        "missing: global/tdd"
+      ],
+      "pass": false
+    },
+    {
+      "id": "soft-cap-fill",
+      "diagnostic": false,
+      "selected": [
+        "quality/a"
+      ],
+      "failures": [
+        "missing: quality/b",
+        "missing: quality/c"
+      ],
+      "pass": false
+    },
+    {
+      "id": "legacy-include",
+      "diagnostic": false,
+      "selected": [
+        "domains/database"
+      ],
+      "failures": [],
+      "pass": true
+    },
+    {
+      "id": "legacy-exclude-wins",
+      "diagnostic": false,
+      "selected": [],
+      "failures": [],
+      "pass": true
+    },
+    {
+      "id": "weak-evidence",
+      "diagnostic": false,
+      "selected": [],
+      "failures": [],
+      "pass": true
+    }
+  ]
+}

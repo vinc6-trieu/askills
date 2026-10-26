@@ -5,8 +5,9 @@ import {
 import {
   codexAdapter
 } from "../adapters/codex.js";
+import type { RoutingOptions } from "../core/task-routing.js";
 
-interface CodexOptions {
+interface CodexOptions extends RoutingOptions {
   exec?: boolean;
   dryRun?: boolean;
 }
@@ -20,6 +21,7 @@ export async function codexCommand(
     codexAdapter,
     task,
     {
+      ...options,
       dryRun:
         options.dryRun,
 

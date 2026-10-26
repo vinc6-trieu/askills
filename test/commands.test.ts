@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import YAML from "yaml";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const registry = path.join(here, "fixtures", "registry");
@@ -59,6 +60,18 @@ test("skill management commands use canonical references", async () => {
     const config = await fs.readFile(".agent-skills.yaml", "utf8");
     assert.match(config, /exclude:/);
     assert.match(config, /default:domains\/event-driven/);
+
+    await fs.writeFile(".agent-skills.yaml", YAML.stringify({ version: 1, profile: "coding", skills: {
+      include: ["domains/event-driven", "global/tdd"], pool: ["languages/rust"], exclude: []
+    } }));
+    await addCommand("default:domains/event-driven", { pool: true });
+    const migrated = YAML.parse(await fs.readFile(".agent-skills.yaml", "utf8"));
+    assert.deepEqual(migrated.skills.include, ["default:global/tdd"]);
+    assert.deepEqual(migrated.skills.pool, ["default:languages/rust", "default:domains/event-driven"]);
+    await removeCommand("default:languages/rust");
+    const removed = YAML.parse(await fs.readFile(".agent-skills.yaml", "utf8"));
+    assert.deepEqual(removed.skills.pool, ["default:domains/event-driven"]);
+    assert.deepEqual(removed.skills.include, ["default:global/tdd"]);
   } finally {
     process.chdir(previousCwd);
     if (previousRegistry === undefined) {

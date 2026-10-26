@@ -9,8 +9,9 @@ import {
 import type {
   AgentId
 } from "../adapters/types.js";
+import type { RoutingOptions } from "../core/task-routing.js";
 
-interface RunOptions {
+interface RunOptions extends RoutingOptions {
   nonInteractive?: boolean;
   dryRun?: boolean;
 }
@@ -45,6 +46,7 @@ export async function runCommand(
     adapter,
     task,
     {
+      ...options,
       dryRun:
         options.dryRun,
 

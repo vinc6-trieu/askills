@@ -1,0 +1,20 @@
+[
+  {
+    "id":"backend-scope", "task":"review API handler", "profile":"coding", "repo":"monorepo",
+    "routing":{"paths":[{"path":"apps/api","profile":"backend-typescript"},{"path":"apps/web","profile":"frontend-nextjs"}]},
+    "paths":["apps/api"], "profiles":["backend-typescript"],
+    "must":["global/code-review","domains/backend-api"], "mustNot":["frameworks/nextjs","frameworks/react"]
+  },
+  {
+    "id":"frontend-scope", "task":"review React Next.js component", "profile":"coding", "repo":"monorepo",
+    "routing":{"paths":[{"path":"apps/api","profile":"backend-typescript"},{"path":"apps/web","profile":"frontend-nextjs"}]},
+    "paths":["apps/web"], "profiles":["frontend-nextjs"],
+    "must":["global/code-review","frameworks/nextjs","frameworks/react"], "mustNot":["frameworks/nestjs"]
+  },
+  {
+    "id":"combined-scope", "task":"review frameworks/nestjs and frameworks/nextjs", "profile":"coding", "repo":"monorepo",
+    "routing":{"paths":[{"path":"apps/api","profile":"backend-typescript"},{"path":"apps/web","profile":"frontend-nextjs"}]},
+    "paths":["apps/api","apps/web"], "profiles":["backend-typescript","frontend-nextjs"],
+    "must":["global/code-review","frameworks/nestjs","frameworks/nextjs"], "maxAuto":6
+  }
+]

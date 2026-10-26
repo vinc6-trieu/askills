@@ -1,0 +1,57 @@
+{
+  "suite": "real-registry-scopes",
+  "registryFingerprint": "dc4d5e6c82df99b297cd5133fb7bd463e28c8566fdd5fdd613819573a63c7c49",
+  "total": 3,
+  "passed": 3,
+  "required": {
+    "total": 3,
+    "passed": 3
+  },
+  "results": [
+    {
+      "id": "backend-scope",
+      "diagnostic": false,
+      "selected": [
+        "global/engineering-discipline",
+        "global/code-review",
+        "global/technical-research",
+        "frameworks/nestjs",
+        "languages/typescript",
+        "domains/backend-api",
+        "global/concise-engineering-output"
+      ],
+      "failures": [],
+      "pass": true
+    },
+    {
+      "id": "frontend-scope",
+      "diagnostic": false,
+      "selected": [
+        "global/engineering-discipline",
+        "frameworks/react",
+        "global/code-review",
+        "global/concise-engineering-output",
+        "domains/frontend-engineering",
+        "frameworks/nextjs",
+        "domains/design-system"
+      ],
+      "failures": [],
+      "pass": true
+    },
+    {
+      "id": "combined-scope",
+      "diagnostic": false,
+      "selected": [
+        "global/engineering-discipline",
+        "frameworks/nextjs",
+        "frameworks/nestjs",
+        "global/code-review",
+        "global/concise-engineering-output",
+        "languages/typescript",
+        "frameworks/react"
+      ],
+      "failures": [],
+      "pass": true
+    }
+  ]
+}

@@ -1,9 +1,10 @@
 {
   "name": "@vincent6.trieu/askills",
-  "version": "0.5.1",
+  "version": "0.5.3",
   "main": "index.js",
   "scripts": {
     "test": "node --import tsx --test test/*.test.ts",
+    "eval": "node --import tsx eval/run.ts",
     "build": "tsc",
     "dev": "tsx src/cli.ts",
     "prepublishOnly": "npm run build && npm test"

@@ -1,0 +1,14 @@
+[
+  {"id":"vi-single-word","task":"lỗi","profile":"coding","repo":"ts-node","must":["global/debugging"],"mustNot":["global/tdd"]},
+  {"id":"vi-compound","task":"sửa lỗi và thêm kiểm thử hồi quy","profile":"coding","repo":"ts-node","must":["global/debugging","global/tdd"]},
+  {"id":"vi-decomposed","task":"sửa lỗi và kiểm thử","profile":"coding","repo":"ts-node","must":["global/debugging","global/tdd"]},
+  {"id":"vi-whitespace","task":"sửa   lỗi và kiểm\n thử","profile":"coding","repo":"ts-node","must":["global/debugging","global/tdd"]},
+  {"id":"vi-phrase-boundary","task":"xsửa lỗi và truy vấnx","profile":"coding","repo":"ts-node","mustNot":["domains/database"]},
+  {"id":"english-tests","task":"fix bug and add tests","profile":"coding","repo":"ts-node","must":["global/debugging","global/tdd"]},
+  {"id":"explicit-over-category-order","task":"fix bug schema query index using frameworks/target","profile":"crowded","repo":"ts-node","must":["frameworks/target"],"maxAuto":4},
+  {"id":"workflow-floor","task":"bug test schema query index","profile":"workflow","repo":"ts-node","must":["global/debugging","global/tdd"],"maxAuto":4},
+  {"id":"soft-cap-fill","task":"verify","profile":"quality","repo":"ts-node","must":["quality/a","quality/b","quality/c"],"maxAuto":3},
+  {"id":"legacy-include","task":"write documentation","profile":"coding","repo":"ts-node","overrides":{"include":["domains/database"]},"must":["domains/database"]},
+  {"id":"legacy-exclude-wins","task":"write documentation","profile":"coding","repo":"ts-node","overrides":{"include":["domains/database"],"exclude":["domains/database"]},"mustNot":["domains/database"]},
+  {"id":"weak-evidence","task":"hello","profile":"coding","repo":"ts-node","mustNot":["global/debugging","global/tdd","domains/database","frameworks/target","languages/rust"]}
+]

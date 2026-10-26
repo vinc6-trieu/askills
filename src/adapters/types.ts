@@ -1,12 +1,13 @@
 import type {
   PreparedAgentTask
 } from "../core/agent-task.js";
+import type { RoutingOptions } from "../core/task-routing.js";
 
 export type AgentId =
   | "codex"
   | "claude";
 
-export interface AgentRunOptions {
+export interface AgentRunOptions extends RoutingOptions {
   dryRun?: boolean;
 
   /**

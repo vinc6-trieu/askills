@@ -155,9 +155,9 @@ async function cleanupGeneratedCodexSkills(
 }
 
 export async function bootstrapCommand(
-  options: { updateLock?: boolean } = {}
+  options: { updateLock?: boolean; root?: string; extraSkills?: string[] } = {}
 ): Promise<void> {
-  const root = process.cwd();
+  const root = options.root ?? process.cwd();
 
   const config =
     await loadProjectConfig(root);
@@ -166,15 +166,12 @@ export async function bootstrapCommand(
 
   const context = await createRegistryContext(root);
 
-  const profile =
-    await resolveProfile(
-      config.profile,
-      context,
-      root
-    );
+  const profiles = await Promise.all(unique([
+    config.profile, ...(config.routing?.paths.map(route => route.profile) ?? [])
+  ]).map(name => resolveProfile(name, context, root)));
 
   const include =
-    config.skills?.include ?? [];
+    [...(config.skills?.include ?? []), ...(config.skills?.pool ?? []), ...(options.extraSkills ?? [])];
 
   const exclude = new Set(
     await Promise.all(
@@ -185,8 +182,8 @@ export async function bootstrapCommand(
   );
 
   const skillIds = unique([
-    ...profile.always,
-    ...profile.pool,
+    ...profiles.flatMap(profile => profile.always),
+    ...profiles.flatMap(profile => profile.pool),
     ...await Promise.all(include.map(async id => (await context.resolveSkill(id)).reference))
   ]).filter(
     id => !exclude.has(id)

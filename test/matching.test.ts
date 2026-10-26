@@ -51,3 +51,13 @@ test("hyphenated and path terms need a word boundary", () => {
     true
   );
 });
+
+test("Unicode words and phrases use letter/mark/number boundaries, not ASCII boundaries", () => {
+  assert.equal(matchesTerm(buildQuery("sửa lỗi"), "lỗi"), true);
+  assert.equal(matchesTerm(buildQuery("sửa lỗi".normalize("NFD")), "sửa lỗi"), true);
+  assert.equal(matchesTerm(buildQuery("SỬA\n  LỖI"), "sửa lỗi"), true);
+  assert.equal(matchesTerm(buildQuery("ãsửa lỗi"), "sửa lỗi"), false);
+  assert.equal(matchesTerm(buildQuery("sửa lỗiễ"), "sửa lỗi"), false);
+  assert.equal(matchesTerm(buildQuery("truy vấnễ"), "truy vấn"), false);
+  assert.equal(matchesTerm(buildQuery("lỗix"), "lỗi"), false);
+});

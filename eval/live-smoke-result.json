@@ -1,0 +1,71 @@
+{
+  "date": "2026-10-26",
+  "scope": "Local routing tests and real-CLI read-only smoke tests using a temporary registry and temporary monorepo projects.",
+  "unitAndIntegrationTests": {
+    "passed": 39,
+    "total": 39
+  },
+  "build": "passed",
+  "typeCheckIncludingTestsAndEval": "passed",
+  "fixtureEval": {
+    "passed": 12,
+    "total": 12
+  },
+  "installedRegistryEval": {
+    "requiredPassed": 6,
+    "requiredTotal": 6,
+    "diagnosticPassed": 0,
+    "diagnosticTotal": 3
+  },
+  "installedRegistryPathEval": {
+    "passed": 3,
+    "total": 3
+  },
+  "versions": {
+    "codex": "0.163.0",
+    "claude": "2.1.309"
+  },
+  "liveTests": [
+    {
+      "agent": "codex",
+      "scope": "api",
+      "exitCode": 0,
+      "timedOut": false,
+      "profileSelected": true,
+      "proofReturned": true,
+      "wrongProofReturned": false,
+      "configUnchanged": true
+    },
+    {
+      "agent": "claude",
+      "scope": "web",
+      "exitCode": 0,
+      "timedOut": false,
+      "profileSelected": true,
+      "proofReturned": true,
+      "wrongProofReturned": false,
+      "configUnchanged": true
+    }
+  ],
+  "liveMethod": "Launch the built askills CLI with --path and non-interactive mode. Each selected skill contains a different random proof marker absent from the task prompt. Assert the final stdout contains the selected marker, not the other marker.",
+  "testOnlyCliFlags": {
+    "codex": [
+      "--ephemeral",
+      "--sandbox",
+      "read-only"
+    ],
+    "claude": [
+      "--no-session-persistence",
+      "--tools",
+      "Read,Glob,Skill",
+      "--allowedTools",
+      "Read,Glob,Skill"
+    ]
+  },
+  "environment": "Initial restricted attempts failed during Codex initialization / Claude authentication. Retrying with reviewed execution permissions and the listed test-only flags succeeded for both.",
+  "limits": [
+    "Two simple proof-marker tasks demonstrate native skill consumption, not general model compliance or routing accuracy on production tasks.",
+    "Missing Vietnamese metadata vocabulary, documentation-only tasks, and negation remain failing diagnostic cases.",
+    "Codex emitted unrelated installed Azure skill-frontmatter and gitnexus MCP startup diagnostics; the probe still completed with exit code 0."
+  ]
+}

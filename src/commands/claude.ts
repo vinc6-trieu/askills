@@ -5,8 +5,9 @@ import {
 import {
   claudeAdapter
 } from "../adapters/claude.js";
+import type { RoutingOptions } from "../core/task-routing.js";
 
-interface ClaudeOptions {
+interface ClaudeOptions extends RoutingOptions {
   print?: boolean;
   dryRun?: boolean;
 }
@@ -20,6 +21,7 @@ export async function claudeCommand(
     claudeAdapter,
     task,
     {
+      ...options,
       dryRun:
         options.dryRun,
 

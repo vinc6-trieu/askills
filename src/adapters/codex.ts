@@ -7,6 +7,7 @@ import type {
 import type {
   PreparedAgentTask
 } from "../core/agent-task.js";
+import { routingContext } from "./routing-context.js";
 
 export const codexAdapter:
   AgentAdapter = {
@@ -35,6 +36,7 @@ export const codexAdapter:
 
     const prompt = [
       markers,
+      routingContext(prepared),
       "",
       prepared.task
     ]

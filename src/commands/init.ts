@@ -21,9 +21,9 @@ export interface InitOptions {
 }
 
 export async function initCommand(
-  options: InitOptions
+  options: InitOptions,
+  root = process.cwd()
 ): Promise<void> {
-  const root = process.cwd();
 
   if (
     await projectConfigExists(root)

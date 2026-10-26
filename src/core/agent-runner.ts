@@ -95,7 +95,9 @@ export async function runAgent(
 
   const prepared =
     await prepareAgentTask(
-      task
+      task,
+      process.cwd(),
+      options
     );
 
   console.log();
@@ -108,9 +110,11 @@ export async function runAgent(
 
   console.log(
     `Profile: ${pc.cyan(
-      prepared.config.profile
+      prepared.resolution.profiles.join(" + ")
     )}`
   );
+
+  if (prepared.paths.length > 0) console.log(`Paths: ${prepared.paths.join(", ")}`);
 
   console.log();
 

@@ -97,7 +97,8 @@ program.command("search")
 program.command("add")
   .description("Force-include a skill in the current project")
   .argument("<skill>", "Skill ID, optionally registry:skill")
-  .action(async (skill: string) => { await addCommand(skill); });
+  .option("--pool", "Add a candidate without forcing selection; explicitly moves a legacy include entry")
+  .action(async (skill: string, options: { pool?: boolean }) => { await addCommand(skill, options); });
 
 program.command("remove")
   .description("Exclude a skill from the current project")
@@ -156,6 +157,8 @@ program
     "--profile <profile>",
     "Skill profile"
   )
+  .option("--path <path>", "Task file or directory (repeatable)", (value: string, previous: string[]) => [...previous, value], [])
+  .option("--skill <skill>", "Require a skill for this invocation (repeatable)", (value: string, previous: string[]) => [...previous, value], [])
   .option(
     "-v, --verbose",
     "Show every scored candidate and why it was not selected"
@@ -166,11 +169,13 @@ program
       options: {
         profile?: string;
         verbose?: boolean;
+        path?: string[];
+        skill?: string[];
       }
     ) => {
       await resolveCommand(
         task,
-        options
+        { ...options, paths: options.path, skills: options.skill }
       );
     }
   );
@@ -184,6 +189,9 @@ program
     "<task>",
     "Coding task"
   )
+  .option("--profile <profile>", "Override the profile for this invocation")
+  .option("--path <path>", "Task file or directory (repeatable)", (value: string, previous: string[]) => [...previous, value], [])
+  .option("--skill <skill>", "Require a skill for this invocation (repeatable)", (value: string, previous: string[]) => [...previous, value], [])
   .option(
     "--exec",
     "Run Codex non-interactively"
@@ -198,11 +206,14 @@ program
       options: {
         exec?: boolean;
         dryRun?: boolean;
+        profile?: string;
+        path?: string[];
+        skill?: string[];
       }
     ) => {
       await codexCommand(
         task,
-        options
+        { ...options, paths: options.path, skills: options.skill }
       );
     }
   );
@@ -216,6 +227,9 @@ program
     "<task>",
     "Coding task"
   )
+  .option("--profile <profile>", "Override the profile for this invocation")
+  .option("--path <path>", "Task file or directory (repeatable)", (value: string, previous: string[]) => [...previous, value], [])
+  .option("--skill <skill>", "Require a skill for this invocation (repeatable)", (value: string, previous: string[]) => [...previous, value], [])
   .option(
     "-p, --print",
     "Run Claude non-interactively and exit"
@@ -230,11 +244,14 @@ program
       options: {
         print?: boolean;
         dryRun?: boolean;
+        profile?: string;
+        path?: string[];
+        skill?: string[];
       }
     ) => {
       await claudeCommand(
         task,
-        options
+        { ...options, paths: options.path, skills: options.skill }
       );
     }
   );
@@ -252,6 +269,9 @@ program
     "<task>",
     "Coding task"
   )
+  .option("--profile <profile>", "Override the profile for this invocation")
+  .option("--path <path>", "Task file or directory (repeatable)", (value: string, previous: string[]) => [...previous, value], [])
+  .option("--skill <skill>", "Require a skill for this invocation (repeatable)", (value: string, previous: string[]) => [...previous, value], [])
   .option(
     "--non-interactive",
     "Run agent non-interactively"
@@ -267,12 +287,15 @@ program
       options: {
         nonInteractive?: boolean;
         dryRun?: boolean;
+        profile?: string;
+        path?: string[];
+        skill?: string[];
       }
     ) => {
       await runCommand(
         agent,
         task,
-        options
+        { ...options, paths: options.path, skills: options.skill }
       );
     }
   );

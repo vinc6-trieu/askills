@@ -83,20 +83,27 @@ export async function searchCommand(query: string): Promise<void> {
   console.log(pc.dim(`${matches} matching skills`));
 }
 
-export async function addCommand(reference: string): Promise<void> {
+export async function addCommand(reference: string, options: { pool?: boolean } = {}): Promise<void> {
   const root = process.cwd();
   const config = await requireProjectConfig(root);
   const context = await createRegistryContext(root);
   const skill = await context.resolveSkill(reference);
-  const include = unique([...(config.skills?.include ?? []), skill.reference]);
-  const exclude = (config.skills?.exclude ?? []).filter(id => id !== reference && id !== skill.reference);
+  const normalize = async (ids: string[]) => Promise.all(ids.map(async id => (await context.resolveSkill(id)).reference));
+  const currentIncludes = await normalize(config.skills?.include ?? []);
+  const currentPool = config.skills?.pool ? await normalize(config.skills.pool) : undefined;
+  const isOther = (id: string) => id !== skill.reference;
+  const include = options.pool
+    ? currentIncludes.filter(isOther)
+    : unique([...currentIncludes, skill.reference]);
+  const pool = options.pool ? unique([...(currentPool ?? []), skill.reference]) : currentPool;
+  const exclude = (await normalize(config.skills?.exclude ?? [])).filter(isOther);
 
   await writeProjectConfig({
     ...config,
-    skills: { include, exclude }
+    skills: { ...config.skills, ...(pool ? { pool } : {}), include, exclude }
   }, root);
 
-  console.log(pc.green(`✓ Added ${skill.reference} to this project`));
+  console.log(pc.green(`✓ Added ${skill.reference} to this project's ${options.pool ? "candidate pool" : "forced includes"}`));
 }
 
 export async function removeCommand(reference: string): Promise<void> {
@@ -104,12 +111,15 @@ export async function removeCommand(reference: string): Promise<void> {
   const config = await requireProjectConfig(root);
   const context = await createRegistryContext(root);
   const skill = await context.resolveSkill(reference);
-  const include = (config.skills?.include ?? []).filter(id => id !== reference && id !== skill.reference);
+  const without = async (ids: string[]) => (await Promise.all(ids.map(async id => (await context.resolveSkill(id)).reference)))
+    .filter(id => id !== skill.reference);
+  const include = await without(config.skills?.include ?? []);
+  const pool = config.skills?.pool ? await without(config.skills.pool) : undefined;
   const exclude = unique([...(config.skills?.exclude ?? []), skill.reference]);
 
   await writeProjectConfig({
     ...config,
-    skills: { include, exclude }
+    skills: { ...config.skills, ...(pool ? { pool } : {}), include, exclude }
   }, root);
 
   console.log(pc.green(`✓ Excluded ${skill.reference} from this project`));

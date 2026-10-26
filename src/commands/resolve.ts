@@ -1,17 +1,8 @@
 import pc from "picocolors";
 
-import {
-  resolveSkills,
-  type ResolveOverrides
-} from "../core/skill-resolver.js";
+import { resolveTask, type RoutingOptions } from "../core/task-routing.js";
 
-import {
-  projectConfigExists,
-  loadProjectConfig
-} from "../core/project-config.js";
-
-interface ResolveOptions {
-  profile?: string;
+interface ResolveOptions extends RoutingOptions {
   verbose?: boolean;
 }
 
@@ -21,45 +12,17 @@ export async function resolveCommand(
 ): Promise<void> {
   const root = process.cwd();
 
-  let profile = options.profile ?? "coding";
-  let overrides: ResolveOverrides = {};
-  let configProfile = false;
-
-  if (await projectConfigExists(root)) {
-    const config =
-      await loadProjectConfig(root);
-
-    if (!options.profile) {
-      profile = config.profile;
-      configProfile = true;
-    }
-
-    overrides = {
-      include:
-        config.skills?.include ?? [],
-
-      exclude:
-        config.skills?.exclude ?? []
-    };
-  }
-
-  const result = await resolveSkills(
-    task,
-    profile,
-    root,
-    overrides
-  );
+  const { config, resolution: result, paths } = await resolveTask(task, root, options);
+  const overrides = config.skills ?? {};
 
   console.log();
   console.log(pc.bold("Askills Resolver"));
   console.log();
 
   console.log(
-    `Profile: ${pc.cyan(result.profile.name)}` +
-    (configProfile
-      ? pc.dim(" (.agent-skills.yaml)")
-      : "")
+    `Profile: ${pc.cyan(result.profile.name)}`
   );
+  if (paths.length > 0) console.log(`Paths: ${paths.join(", ")}`);
 
   if ((overrides.include ?? []).length > 0) {
     console.log(
