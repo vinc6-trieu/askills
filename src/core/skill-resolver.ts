@@ -1,3 +1,4 @@
+import { refusesSkill, taskDirectives } from "./task-directives.js";
 import { resolveProfile } from "./profile-resolver.js";
 
 import { loadSkillMetas } from "./skill-registry.js";
@@ -212,7 +213,8 @@ export async function resolveSkills(
 
   const repo = await scopedRepository(root, await taskPaths(root, overrides.paths ?? []));
 
-  const query = buildQuery(task);
+  const directives = taskDirectives(task);
+  const query = buildQuery(directives.positive);
 
   const normalizeIds = async (ids: string[]): Promise<string[]> =>
     Promise.all(ids.map(async id =>
@@ -245,7 +247,7 @@ export async function resolveSkills(
   }
 
   const scored: ScoredSkill[] = [];
-  const intent = requirementsIntent(task);
+  const intent = requirementsIntent(directives.clauses);
 
   for (const meta of metas.values()) {
     const item = scoreSkill(query, meta, repo, intent === "settled");
@@ -259,6 +261,9 @@ export async function resolveSkills(
       }
     }
 
+    if (!forced.has(meta.id) && refusesSkill(directives.refused, meta.id)) {
+      item.rejection = "skill declined in this request";
+    }
     if (meta.auto === false && !forced.has(meta.id)) {
       item.rejection = "auto: false";
       scored.push(item);

@@ -1,3 +1,4 @@
+import { refusesSkill, taskDirectives } from "../core/task-directives.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,12 +57,14 @@ export async function runClaudePromptHook(raw: string) {
       reason === "explicit skill match" || reason === "config include (forced)" ||
       reason.startsWith("intent:") || reason.startsWith("keyword:")
     ));
+    const { refused } = taskDirectives(prompt);
     const names: string[] = [];
     const visible: string[] = [];
     let clarify = false;
     for (const skill of relevant) {
       try {
         const descriptor = await loadSkillDescriptor(skill.id, context);
+        if (refusesSkill(refused, skill.id, descriptor.name)) continue;
         if (!/^[a-z0-9][a-z0-9_-]*$/i.test(descriptor.name)) continue;
         const native = path.join(root, ".claude", "skills", descriptor.name, "SKILL.md");
         const [actual, expected] = await Promise.all([

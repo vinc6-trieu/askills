@@ -20,6 +20,12 @@ const cases = [
   { id: "settled-en", clarify: false, absentSkill: "domain-modeling", prompt: "The requirements are settled. Retry once only if the process failed to start. Implement that behavior." },
   { id: "follow-up", clarify: false, prompt: "Chốt chỉ thử lại một lần nếu tiến trình chưa khởi động được. Làm theo phương án đó nhé." },
   { id: "settled-plus-design", clarify: false, otherSkill: "domain-modeling", prompt: "Requirements are settled. Design a domain model for invoices." },
+  { id: "refused-skill-vi", clarify: false, absentSkill: "tdd", otherSkill: "code-review", prompt: "Đừng dùng TDD, chỉ review @src/core/agent-runner.ts" },
+  { id: "refused-skill-en", clarify: false, absentSkill: "tdd", otherSkill: "code-review", prompt: "Don't use /tdd. Review @src/core/agent-runner.ts instead." },
+  { id: "quote-vi", clarify: false, prompt: "Dịch câu “làm rõ yêu cầu” sang tiếng Anh." },
+  { id: "quote-en", clarify: false, prompt: 'Translate "clarify the requirements" into Vietnamese.' },
+  { id: "scoped-decline-vi", clarify: true, prompt: "Không cần hỏi lại về UI. Hãy giúp tôi làm rõ yêu cầu về quyền xem báo cáo." },
+  { id: "scoped-decline-en", clarify: true, prompt: "Don't ask about UI, but clarify the requirements for permissions." },
   { id: "open-alternatives", clarify: true, prompt: "Khi import gặp mã trùng, chưa biết nên ghi đè hay bỏ qua. Xử lý thế nào?" },
   { id: "review-spec", clarify: false, otherSkill: "code-review", prompt: "Review the implementation against the requirements in @src/core/agent-runner.ts." }
 ];

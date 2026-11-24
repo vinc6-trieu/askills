@@ -39,8 +39,7 @@ function clauseIntent(prompt: string): "requested" | "possible" | "settled" | "d
 }
 
 
-export function requirementsIntent(prompt: string) {
-  const clauses = prompt.split(/[.;!?\n]+/u).map(clause => clause.trim()).filter(Boolean);
+export function requirementsIntent(clauses: string[]) {
   let decision: ReturnType<typeof clauseIntent>;
   let remaining: string[] = [];
   for (const clause of clauses) {
