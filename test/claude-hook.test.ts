@@ -76,6 +76,7 @@ test("clarification hints respect user intent, prior decisions and the project p
   await fs.writeFile(config, "profile: coding\n");
   assert.equal(await run(request), undefined);
   await fs.writeFile(config, `profile: coding\nskills:\n  pool: [${id}]\n`);
+  assert.equal(await run('Translate "clarify the requirements" into Vietnamese.'), undefined);
   const explicit = await run(request);
   assert.match(explicit?.systemMessage ?? "", /\/requirements-discovery\b/);
   for (const prompt of ["Add retries when the worker fails.", "Xử lý bản ghi trùng khi đồng bộ khách hàng."]) {
@@ -96,6 +97,7 @@ test("clarification hints respect user intent, prior decisions and the project p
   await fs.writeFile(config, `profile: coding\nskills:\n  pool: [${id}]\n  exclude: [${id}]\n`);
   assert.equal(await run(request), undefined);
   await fs.writeFile(config, `profile: coding\nskills:\n  include: [${id}]\n`);
+  assert.equal(await run("Đừng dùng requirements-discovery"), undefined);
   assert.match((await run("The requirements are final."))?.systemMessage ?? "", /\/requirements-discovery\b/);
 });
 
