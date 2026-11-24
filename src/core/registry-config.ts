@@ -50,6 +50,20 @@ async function exists(target: string): Promise<boolean> {
   }
 }
 
+/**
+ * The checkout a registry is read and synced from. The original single-registry
+ * install lives at ASKILLS_HOME/registry; it remains the "default" source until a
+ * registries/default checkout exists, including after other registries are added.
+ */
+async function registrySource(name: string): Promise<string> {
+  if (process.env.ASKILLS_REGISTRY_PATH) return process.env.ASKILLS_REGISTRY_PATH;
+  const source = registrySourceRoot(name);
+  if (name === "default" && !(await exists(source)) && await exists(path.join(registryRoot(), ".git"))) {
+    return registryRoot();
+  }
+  return source;
+}
+
 function validateDefinitions(
   definitions: RegistryDefinition[]
 ): RegistryDefinition[] {
@@ -170,7 +184,7 @@ export async function syncRegistries(): Promise<Array<{
   const result: Array<{ name: string; commit: string }> = [];
 
   for (const registry of definitions) {
-    const source = process.env.ASKILLS_REGISTRY_PATH ?? registrySourceRoot(registry.name);
+    const source = await registrySource(registry.name);
 
     if (!process.env.ASKILLS_REGISTRY_PATH) {
       await runGitOutput(["-C", source, "pull", "--ff-only"]);
@@ -190,7 +204,7 @@ export async function registryCommit(root: string): Promise<string> {
 export async function ensureRegistrySnapshot(
   registry: RegistryDefinition
 ): Promise<{ root: string; commit: string }> {
-  const source = process.env.ASKILLS_REGISTRY_PATH ?? registrySourceRoot(registry.name);
+  const source = await registrySource(registry.name);
   const commit = await registryCommit(source);
   const cache = registryCacheRoot(registry.name, commit);
 
@@ -255,8 +269,7 @@ export async function createRegistryContext(
       continue;
     }
 
-    const source = process.env.ASKILLS_REGISTRY_PATH ?? registrySourceRoot(registry.name);
-    locations.push({ ...registry, root: source });
+    locations.push({ ...registry, root: await registrySource(registry.name) });
   }
 
   return new RegistryContext(locations);
