@@ -16,7 +16,8 @@ interface Source {
 interface Suggestion {
   name: string;
   description: string;
-  url: string;
+  /** Pinned upstream directory; absent for registry skills without UPSTREAM.json. */
+  url?: string;
   matches: string[];
   reference?: string;
   stars?: number;
@@ -101,21 +102,25 @@ async function inventory(root: string, context: RegistryContext | undefined, ter
       const installed = active.has(skill.reference);
       const excluded = pool.exclude.has(skill.reference);
       if (installed || excluded) blockedNames.add(name);
+      if (!installed && !excluded && hasProject) {
+        const matched = matches(`${name} ${description ?? ""}`, terms);
+        if (matched.length) suggestions.push({
+          name, description: description ?? "", reference: skill.reference, matches: matched
+        });
+      }
+      // Provenance is optional: it only adds an upstream link and an upstream comparison.
       const source = await readSource(skill.root);
       if (!source) {
         if (installed) untracked++;
         continue;
       }
       knownSources.add(`${source.repo}/${source.directory}`);
+      const candidate = suggestions.at(-1);
+      if (candidate?.reference === skill.reference) candidate.url = skillUrl(source);
       if (installed) {
         const group = tracked.get(source.repo) ?? [];
         group.push({ reference: skill.reference, source });
         tracked.set(source.repo, group);
-      } else if (!excluded && hasProject) {
-        const matched = matches(`${name} ${description ?? ""}`, terms);
-        if (matched.length) suggestions.push({
-          name, description: description ?? "", url: skillUrl(source), reference: skill.reference, matches: matched
-        });
       }
     } catch (error) {
       warnings.add(`${skill.reference}: ${shortError(error)}`);
@@ -171,6 +176,7 @@ export async function discoverSkills(root: string, context: RegistryContext | un
   const terms = [...new Set(searchTerms.length ? searchTerms : [...projectTerms, ...codingTerms])];
   const { warnings, suggestions, active, tracked, knownSources, blockedNames, untracked } = await inventory(root, context, registryTerms);
   const updates: Update[] = [];
+  const registryNames = new Map<string, string>();
   let checkedUpstreams = 0;
 
   const found = await github.search().catch(error => {
@@ -200,9 +206,18 @@ export async function discoverSkills(root: string, context: RegistryContext | un
     }
   }
 
-  suggestions.sort((a, b) => b.matches.length - a.matches.length || Number(!!b.reference) - Number(!!a.reference) ||
-    (b.stars ?? 0) - (a.stars ?? 0) || a.name.localeCompare(b.name) || a.url.localeCompare(b.url));
-  const selected = suggestions.filter(item => {
+  // A registry skill claims its name before any GitHub result, in configured registry order
+  // (inventory lists registry skills first and in that order).
+  for (const item of suggestions) {
+    if (item.reference && !blockedNames.has(item.name)) registryNames.set(item.name, item.reference);
+  }
+  const ranked = suggestions.filter(item => {
+    const owner = registryNames.get(item.name);
+    return owner === undefined || owner === item.reference;
+  });
+  ranked.sort((a, b) => b.matches.length - a.matches.length || Number(!!b.reference) - Number(!!a.reference) ||
+    (b.stars ?? 0) - (a.stars ?? 0) || a.name.localeCompare(b.name) || (a.url ?? "").localeCompare(b.url ?? ""));
+  const selected = ranked.filter(item => {
     if (blockedNames.has(item.name)) return false;
     blockedNames.add(item.name);
     return true;
