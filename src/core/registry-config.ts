@@ -205,7 +205,7 @@ export async function ensureRegistrySnapshot(
 
 export async function createRegistryContext(
   root = process.cwd(),
-  options: { useLock?: boolean } = {}
+  options: { useLock?: boolean; lock?: ProjectLock } = {}
 ): Promise<RegistryContext> {
   const definitions = await loadRegistryDefinitions();
   const config = await (
@@ -224,7 +224,7 @@ export async function createRegistryContext(
     return registry;
   });
 
-  const lock = options.useLock === false ? undefined : await loadProjectLock(root);
+  const lock = options.useLock === false ? undefined : options.lock ?? await loadProjectLock(root);
   const locations: RegistryLocation[] = [];
 
   for (const registry of selected) {
@@ -272,6 +272,12 @@ export async function lockProjectRegistries(
     return existing;
   }
 
+  const lock = await prepareProjectLock(root);
+  await writeProjectLock(lock, root);
+  return lock;
+}
+
+export async function prepareProjectLock(root: string): Promise<ProjectLock> {
   const definitions = await loadRegistryDefinitions();
   const config = await loadProjectConfig(root);
   const selected = (config.registries ?? definitions.map(item => item.name)).map(name => {
@@ -289,7 +295,5 @@ export async function lockProjectRegistries(
     return { name: registry.name, url: registry.url, commit: snapshot.commit };
   }));
 
-  const lock: ProjectLock = { version: 1, registries };
-  await writeProjectLock(lock, root);
-  return lock;
+  return {version: 1, registries};
 }

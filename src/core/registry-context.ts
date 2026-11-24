@@ -63,6 +63,8 @@ async function exists(target: string): Promise<boolean> {
   }
 }
 
+class SkillNotFound extends Error {}
+
 export class RegistryContext {
   readonly registries: RegistryLocation[];
 
@@ -111,7 +113,7 @@ export class RegistryContext {
       const root = this.skillRoot(registry, parsed.id);
 
       if (!(await exists(path.join(root, "SKILL.md")))) {
-        throw new Error(`Skill "${reference}" was not found.`);
+        throw new SkillNotFound(`Skill "${reference}" was not found.`);
       }
 
       return {
@@ -137,7 +139,16 @@ export class RegistryContext {
       }
     }
 
-    throw new Error(`Skill "${reference}" was not found in any registry.`);
+    throw new SkillNotFound(`Skill "${reference}" was not found in any registry.`);
+  }
+
+  /** A retired excluded skill stays excluded if it is reintroduced later. */
+  async exclusionReference(id: string): Promise<string> {
+    try { return (await this.resolveSkill(id)).reference; }
+    catch (error) {
+      if (error instanceof SkillNotFound) return id;
+      throw error;
+    }
   }
 
   async listSkills(): Promise<ResolvedRegistrySkill[]> {

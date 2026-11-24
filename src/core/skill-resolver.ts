@@ -8,6 +8,7 @@ import type { RegistryContext } from "./registry-context.js";
 
 import { detectRepository } from "./repo-detector.js";
 import { scopedRepository, taskPaths } from "./task-scope.js";
+import { inferredRequirementsReason, isRequirementsSkill, requirementsIntent } from "./requirements-intent.js";
 
 import type {
   ResolveResult,
@@ -92,10 +93,13 @@ function scoreSkill(
   query: TaskQuery,
   meta: SkillMeta,
   repo: Awaited<ReturnType<typeof detectRepository>>,
+  settledRequirements: boolean,
 ): ScoredSkill {
   let score = 0;
 
   const reasons: string[] = [];
+  const matchesRoutingTerm = (term: string) =>
+    !(settledRequirements && normalize(term) === "requirements") && matchesTerm(query, term);
 
   const idTail = meta.id.split("/").pop() ?? meta.id;
 
@@ -105,7 +109,7 @@ function scoreSkill(
   }
 
   for (const intent of meta.intents ?? []) {
-    if (matchesTerm(query, intent)) {
+    if (matchesRoutingTerm(intent)) {
       score += 35;
       reasons.push(`intent:${intent}`);
     }
@@ -114,7 +118,7 @@ function scoreSkill(
   let keywordScore = 0;
 
   for (const keyword of meta.keywords ?? []) {
-    if (matchesTerm(query, keyword)) {
+    if (matchesRoutingTerm(keyword)) {
       keywordScore += 10;
       reasons.push(`keyword:${keyword}`);
     }
@@ -215,7 +219,7 @@ export async function resolveSkills(
       (await registryContext.resolveSkill(id)).reference
     ));
 
-  const normalizedExclude = await normalizeIds(overrides.exclude ?? []);
+  const normalizedExclude = await Promise.all((overrides.exclude ?? []).map(id => registryContext.exclusionReference(id)));
   const normalizedInclude = await normalizeIds(overrides.include ?? []);
   const normalizedPool = await normalizeIds(overrides.pool ?? []);
   const requested = await normalizeIds(overrides.skills ?? []);
@@ -241,9 +245,19 @@ export async function resolveSkills(
   }
 
   const scored: ScoredSkill[] = [];
+  const intent = requirementsIntent(task);
 
   for (const meta of metas.values()) {
-    const item = scoreSkill(query, meta, repo);
+    const item = scoreSkill(query, meta, repo, intent === "settled");
+    if (isRequirementsSkill(meta.id) && !forced.has(meta.id)) {
+      const named = item.reasons.includes("explicit skill match");
+      if (intent === "declined" || (!named && (intent === "settled" || intent === "read-only"))) {
+        item.rejection = `clarification: ${intent}`;
+      } else if (!named && (intent === "possible" || intent === "requested")) {
+        item.score += 35;
+        item.reasons.push(intent === "possible" ? inferredRequirementsReason : "intent:clarification requested");
+      }
+    }
 
     if (meta.auto === false && !forced.has(meta.id)) {
       item.rejection = "auto: false";

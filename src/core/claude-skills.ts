@@ -3,7 +3,6 @@ import path from "node:path";
 import YAML from "yaml";
 
 import {
-  loadSkillDescriptor,
   type SkillDescriptor
 } from "./skill-frontmatter.js";
 
@@ -11,9 +10,7 @@ import {
   writeAskillsLocalExcludes
 } from "./git-exclude.js";
 
-import type {
-  RegistryContext
-} from "./registry-context.js";
+import type { BootstrapTransaction } from "./bootstrap-transaction.js";
 
 interface ClaudeSkillState {
   version: number;
@@ -77,9 +74,9 @@ async function loadPreviousState(
 }
 
 export async function prepareClaudeSkills(
-  ids: string[],
-  root = process.cwd(),
-  context?: RegistryContext
+  descriptors: SkillDescriptor[],
+  root: string,
+  transaction: BootstrapTransaction
 ): Promise<ClaudeSkillResult> {
   const runtimeRoot = path.join(
     root,
@@ -92,19 +89,7 @@ export async function prepareClaudeSkills(
     "skills"
   );
 
-  await fs.mkdir(
-    runtimeRoot,
-    {
-      recursive: true
-    }
-  );
-
-  await fs.mkdir(
-    claudeRoot,
-    {
-      recursive: true
-    }
-  );
+  await transaction.directory(claudeRoot);
 
   const previous =
     await loadPreviousState(
@@ -123,13 +108,9 @@ export async function prepareClaudeSkills(
       name
     );
 
+    if (path.basename(name) !== name || name === "." || name === "..") throw new Error("Invalid skill name in Claude state");
     if (await isSymlink(target)) {
-      await fs.rm(
-        target,
-        {
-          force: true
-        }
-      );
+      await transaction.remove(target);
     }
   }
 
@@ -139,43 +120,8 @@ export async function prepareClaudeSkills(
   const skipped:
     ClaudeSkillResult["skipped"] = [];
 
-  const names =
-    new Map<string, string>();
-
-  for (const id of [...new Set(ids)]) {
-    const descriptor =
-      await loadSkillDescriptor(id, context);
-
-    const name =
-      descriptor.name.trim();
-
-    if (
-      name.toLowerCase() ===
-      "synced"
-    ) {
-      throw new Error(
-        `Claude Code reserves the skill name "synced": ${id}`
-      );
-    }
-
-    const duplicate =
-      names.get(name);
-
-    if (duplicate) {
-      throw new Error(
-        [
-          `Duplicate Claude skill name "${name}".`,
-          `  ${duplicate}`,
-          `  ${id}`
-        ].join("\n")
-      );
-    }
-
-    names.set(
-      name,
-      id
-    );
-
+  for (const descriptor of descriptors) {
+    const {id, name} = descriptor;
     const target = path.join(
       claudeRoot,
       name
@@ -197,20 +143,14 @@ export async function prepareClaudeSkills(
       continue;
     }
 
-    await fs.symlink(
-      descriptor.path,
-      target,
-      process.platform === "win32"
-        ? "junction"
-        : "dir"
-    );
+    await transaction.link(descriptor.path, target);
 
     installed.push(
       descriptor
     );
   }
 
-  await fs.writeFile(
+  await transaction.writeFile(
     path.join(
       runtimeRoot,
       "claude-skills.yaml"
@@ -221,8 +161,7 @@ export async function prepareClaudeSkills(
         installed.map(
           skill => skill.name
         )
-    }),
-    "utf8"
+    })
   );
 
   await writeAskillsLocalExcludes(
@@ -230,7 +169,7 @@ export async function prepareClaudeSkills(
       skill =>
         `.claude/skills/${skill.name}`
     ),
-    root
+    root, transaction
   );
 
   return {

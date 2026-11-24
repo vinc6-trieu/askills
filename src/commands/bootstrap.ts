@@ -7,14 +7,10 @@ import {
   loadProjectConfig
 } from "../core/project-config.js";
 
-import {
-  resolveProfile
-} from "../core/profile-resolver.js";
+import { projectSkillPool } from "../core/project-pool.js";
 
-import {
-  createRegistryContext,
-  lockProjectRegistries
-} from "../core/registry-config.js";
+import { withProjectBootstrap, type BootstrapTransaction } from "../core/bootstrap-transaction.js";
+import type { RegistryContext } from "../core/registry-context.js";
 
 import {
   loadSkillMeta
@@ -40,12 +36,6 @@ import {
 const CODEX_GENERATED_PREFIX =
   "askills--";
 
-function unique(
-  values: string[]
-): string[] {
-  return [...new Set(values)];
-}
-
 function flattenId(
   id: string
 ): string {
@@ -55,48 +45,8 @@ function flattenId(
   );
 }
 
-async function skillExists(
-  id: string,
-  context: Awaited<ReturnType<typeof createRegistryContext>>
-): Promise<boolean> {
-  try {
-    await fs.access(path.join((await context.resolveSkill(id)).root, "SKILL.md"));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function linkDirectory(
-  source: string,
-  target: string
-): Promise<void> {
-  await fs.mkdir(
-    path.dirname(target),
-    {
-      recursive: true
-    }
-  );
-
-  await fs.rm(
-    target,
-    {
-      recursive: true,
-      force: true
-    }
-  );
-
-  await fs.symlink(
-    source,
-    target,
-    process.platform === "win32"
-      ? "junction"
-      : "dir"
-  );
-}
-
 async function cleanupGeneratedCodexSkills(
-  root: string
+  root: string, transaction: BootstrapTransaction
 ): Promise<string> {
   const codexSkillsRoot =
     path.join(
@@ -105,12 +55,7 @@ async function cleanupGeneratedCodexSkills(
       "skills"
     );
 
-  await fs.mkdir(
-    codexSkillsRoot,
-    {
-      recursive: true
-    }
-  );
+  await transaction.directory(codexSkillsRoot);
 
   const entries =
     await fs.readdir(
@@ -126,30 +71,12 @@ async function cleanupGeneratedCodexSkills(
         CODEX_GENERATED_PREFIX
       )
     ) {
-      await fs.rm(
-        path.join(
-          codexSkillsRoot,
-          entry.name
-        ),
-        {
-          recursive: true,
-          force: true
-        }
-      );
+      await transaction.remove(path.join(codexSkillsRoot, entry.name));
     }
   }
 
   // Cleanup old implementation.
-  await fs.rm(
-    path.join(
-      codexSkillsRoot,
-      "askills-generated"
-    ),
-    {
-      recursive: true,
-      force: true
-    }
-  );
+  await transaction.remove(path.join(codexSkillsRoot, "askills-generated"));
 
   return codexSkillsRoot;
 }
@@ -159,170 +86,46 @@ export async function bootstrapCommand(
 ): Promise<void> {
   const root = options.root ?? process.cwd();
 
-  const config =
-    await loadProjectConfig(root);
+  const summary = await withProjectBootstrap(root, Boolean(options.updateLock), (context, transaction) =>
+    applyBootstrap(root, context, transaction, options.extraSkills));
+  console.log(pc.green("✓ Skills bootstrapped"));
+  console.log(summary);
+}
 
-  await lockProjectRegistries(root, options.updateLock);
-
-  const context = await createRegistryContext(root);
-
-  const profiles = await Promise.all(unique([
-    config.profile, ...(config.routing?.paths.map(route => route.profile) ?? [])
-  ]).map(name => resolveProfile(name, context, root)));
-
-  const include =
-    [...(config.skills?.include ?? []), ...(config.skills?.pool ?? []), ...(options.extraSkills ?? [])];
-
-  const exclude = new Set(
-    await Promise.all(
-      (config.skills?.exclude ?? []).map(async id =>
-        (await context.resolveSkill(id)).reference
-      )
-    )
-  );
-
-  const skillIds = unique([
-    ...profiles.flatMap(profile => profile.always),
-    ...profiles.flatMap(profile => profile.pool),
-    ...await Promise.all(include.map(async id => (await context.resolveSkill(id)).reference))
-  ]).filter(
-    id => !exclude.has(id)
-  );
-
-  const runtimeRoot =
-    path.join(
-      root,
-      ".askills"
-    );
-
-  const poolRoot =
-    path.join(
-      runtimeRoot,
-      "pool"
-    );
-
-  await fs.rm(
-    poolRoot,
-    {
-      recursive: true,
-      force: true
-    }
-  );
-
-  await fs.mkdir(
-    poolRoot,
-    {
-      recursive: true
-    }
-  );
-
-  const codexSkillsRoot =
-    await cleanupGeneratedCodexSkills(
-      root
-    );
-
-  await ensureAskillsGitignore(
-    root
-  );
-
-  const installed: Array<{
-    id: string;
-    name: string;
-  }> = [];
-
-  const descriptors:
-    SkillDescriptor[] = [];
-
-  const skillNames =
-    new Map<string, string>();
-
-  for (const id of skillIds) {
-    if (!(await skillExists(id, context))) {
-      throw new Error(
-        `Skill not found in registry: ${id}`
-      );
-    }
-
-    // Validate routing metadata.
+export async function applyBootstrap(root: string, context: RegistryContext,
+  transaction: BootstrapTransaction, extraSkills: string[] = []) {
+  const config = await loadProjectConfig(root);
+  const { ids } = await projectSkillPool(config, context, root, extraSkills);
+  const descriptors: SkillDescriptor[] = [];
+  const names = new Map<string, string>();
+  const codexNames = new Set<string>();
+  for (const id of ids) {
     await loadSkillMeta(id, context);
-
-    // Validate SKILL.md + obtain Codex invocation name.
-    const descriptor =
-      await loadSkillDescriptor(id, context);
-
-    const existing =
-      skillNames.get(
-        descriptor.name
-      );
-
-    if (existing) {
-      throw new Error(
-        [
-          `Duplicate skill name "${descriptor.name}".`,
-          `  ${existing}`,
-          `  ${id}`,
-          "",
-          "Codex skill names must be unique inside the project pool."
-        ].join("\n")
-      );
+    const descriptor = await loadSkillDescriptor(id, context);
+    const name = descriptor.name.trim();
+    if (!name || path.basename(name) !== name || /[\\/]/.test(name) || [".", "..", "synced"].includes(name.toLowerCase())) {
+      throw new Error(`Invalid or reserved native skill name "${name}" for ${id}`);
     }
-
-    skillNames.set(
-      descriptor.name,
-      id
-    );
-
-    const source =
-      descriptor.path;
-
-    /*
-     * Agent-neutral candidate pool.
-     */
-    await linkDirectory(
-      source,
-      path.join(
-        poolRoot,
-        id
-      )
-    );
-
-    /*
-     * Codex-native repo skill discovery.
-     *
-     * Important:
-     * skills are direct children of .agents/skills.
-     */
-    await linkDirectory(
-      source,
-      path.join(
-        codexSkillsRoot,
-        `${CODEX_GENERATED_PREFIX}${flattenId(id)}`
-      )
-    );
-
-    installed.push({
-      id,
-      name: descriptor.name
-    });
-
-    descriptors.push(
-      descriptor
-    );
+    if (names.has(name)) throw new Error(`Duplicate skill name "${name}": ${names.get(name)}, ${id}`);
+    if (codexNames.has(flattenId(id))) throw new Error(`Duplicate Codex directory for ${id}`);
+    names.set(name, id);
+    codexNames.add(flattenId(id));
+    descriptors.push({...descriptor, name});
   }
 
-  const claude =
-    await prepareClaudeSkills(
-      skillIds,
-      root,
-      context
-    );
-
-  const agentGuides =
-    await writeAgentGuides(
-      descriptors,
-      config.agent_instructions !== false,
-      root
-    );
+  const runtimeRoot = path.join(root, ".askills");
+  const poolRoot = path.join(runtimeRoot, "pool");
+  await transaction.remove(poolRoot);
+  await transaction.directory(poolRoot);
+  const codexSkillsRoot = await cleanupGeneratedCodexSkills(root, transaction);
+  await ensureAskillsGitignore(root, transaction);
+  const installed = descriptors.map(({id, name}) => ({id, name}));
+  for (const descriptor of descriptors) {
+    await transaction.link(descriptor.path, path.join(poolRoot, descriptor.id));
+    await transaction.link(descriptor.path, path.join(codexSkillsRoot, CODEX_GENERATED_PREFIX + flattenId(descriptor.id)));
+  }
+  const claude = await prepareClaudeSkills(descriptors, root, transaction);
+  const agentGuides = await writeAgentGuides(descriptors, config.agent_instructions !== false, root, transaction);
 
   const state = {
     version: 1,
@@ -373,74 +176,20 @@ export async function bootstrapCommand(
       installed
   };
 
-  await fs.writeFile(
+  await transaction.writeFile(
     path.join(
       runtimeRoot,
       "state.yaml"
     ),
-    YAML.stringify(state),
-    "utf8"
+    YAML.stringify(state)
   );
 
-  console.log();
-
-  console.log(
-    pc.green(
-      "✓ Skills bootstrapped"
-    )
-  );
-
-  console.log(
-    `  Profile: ${pc.cyan(
-      config.profile
-    )}`
-  );
-
-  console.log(
-    `  Skills: ${installed.length}`
-  );
-
-  console.log(
-    `  Pool: ${poolRoot}`
-  );
-
-  console.log(
-    `  Codex: ${codexSkillsRoot}`
-  );
-
-  console.log(
-    `  Claude: ${claude.root}`
-  );
-
-  if (agentGuides.written.length > 0) {
-    console.log(
-      `  Agent guides: ${agentGuides.written.join(", ")}`
-    );
-  }
-
-  if (agentGuides.removed.length > 0) {
-    console.log(
-      `  Agent guides removed: ${agentGuides.removed.join(", ")}`
-    );
-  }
-
-  if (claude.skipped.length > 0) {
-    console.log();
-
-    console.log(
-      pc.yellow(
-        "  Claude skill collisions:"
-      )
-    );
-
-    for (
-      const item of claude.skipped
-    ) {
-      console.log(
-        `    ${item.name}: ${item.reason}`
-      );
-    }
-  }
-
-  console.log();
+  const lines = [
+    `  Profile: ${config.profile}`, `  Skills: ${installed.length}`, `  Pool: ${poolRoot}`,
+    `  Codex: ${codexSkillsRoot}`, `  Claude: ${claude.root}`
+  ];
+  if (agentGuides.written.length) lines.push(`  Agent guides: ${agentGuides.written.join(", ")}`);
+  if (agentGuides.removed.length) lines.push(`  Agent guides removed: ${agentGuides.removed.join(", ")}`);
+  if (claude.skipped.length) lines.push("  Claude skill collisions:", ...claude.skipped.map(item => `    ${item.name}: ${item.reason}`));
+  return lines.join("\n");
 }

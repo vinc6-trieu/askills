@@ -4,7 +4,9 @@ import {
   syncRegistries
 } from "../core/registry-config.js";
 
-export async function syncCommand(): Promise<void> {
+import { discoverCommand } from "./discover.js";
+
+export async function syncCommand(options = { discover: true }): Promise<void> {
   console.log();
   console.log(
     "Updating skill registry..."
@@ -21,5 +23,13 @@ export async function syncCommand(): Promise<void> {
 
   for (const registry of registries) {
     console.log(`  ${registry.name}: ${registry.commit}`);
+  }
+
+  if (options.discover) {
+    try {
+      await discoverCommand();
+    } catch (error) {
+      console.warn(`Skill discovery unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 }

@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import YAML from "yaml";
 
 export interface ProjectRegistryLock {
@@ -44,9 +45,12 @@ export async function writeProjectLock(
   lock: ProjectLock,
   root = process.cwd()
 ): Promise<void> {
-  await fs.writeFile(
-    projectLockPath(root),
-    YAML.stringify(lock),
-    "utf8"
-  );
+  const file = projectLockPath(root);
+  const temp = file + "." + randomUUID() + ".tmp";
+  try {
+    await fs.writeFile(temp, YAML.stringify(lock), { flag: "wx" });
+    await fs.rename(temp, file);
+  } finally {
+    await fs.rm(temp, { force: true });
+  }
 }

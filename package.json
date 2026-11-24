@@ -5,6 +5,7 @@
   "scripts": {
     "test": "node --import tsx --test test/*.test.ts",
     "eval": "node --import tsx eval/run.ts",
+    "eval:clarification": "node --import tsx eval/clarification.ts",
     "build": "tsc",
     "dev": "tsx src/cli.ts",
     "prepublishOnly": "npm run build && npm test"
