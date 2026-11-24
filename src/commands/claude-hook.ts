@@ -3,20 +3,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { configureClaudeHook } from "../core/claude-hook-settings.js";
-import { projectConfigExists } from "../core/project-config.js";
+import { findProjectRoot as projectRoot } from "../core/project-config.js";
 import { loadSkillDescriptor } from "../core/skill-frontmatter.js";
 import { resolveTask } from "../core/task-routing.js";
 import { inferredRequirementsReason, isRequirementsSkill } from "../core/requirements-intent.js";
-
-async function projectRoot(cwd: string): Promise<string | undefined> {
-  let current = cwd;
-  for (;;) {
-    if (await projectConfigExists(current)) return current;
-    const parent = path.dirname(current);
-    if (parent === current || await fs.lstat(path.join(current, ".git")).then(() => true, () => false)) return;
-    current = parent;
-  }
-}
 
 async function mentionedPaths(prompt: string, root: string, cwd: string): Promise<string[]> {
   const paths = new Set<string>();

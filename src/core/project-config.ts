@@ -49,6 +49,17 @@ export async function projectConfigExists(
   }
 }
 
+/** Nearest directory with .agent-skills.yaml, without crossing into an enclosing Git repository. */
+export async function findProjectRoot(cwd: string): Promise<string | undefined> {
+  let current = path.resolve(cwd);
+  for (;;) {
+    if (await projectConfigExists(current)) return current;
+    const parent = path.dirname(current);
+    if (parent === current || await fs.lstat(path.join(current, ".git")).then(() => true, () => false)) return;
+    current = parent;
+  }
+}
+
 export async function loadProjectConfig(
   root = process.cwd()
 ): Promise<ProjectConfig> {

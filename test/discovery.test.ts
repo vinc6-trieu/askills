@@ -97,6 +97,18 @@ test("only relevant registered skills are offered and excluded names stay suppre
   assert.deepEqual(report.suggestions.map(s => s.reference), ["default:global/typescript-style"]);
 });
 
+test("native registry suggestions win same-name matches online and offline without provenance", async t => {
+  const {root, context} = await fixture(t);
+  const local = path.join(context.registries[0].root, "skills/languages/typescript");
+  await fs.mkdir(local, {recursive:true});
+  await fs.writeFile(path.join(local, "SKILL.md"), "---\nname: lint-typescript\ndescription: TypeScript\n---\nUse TypeScript.");
+  for (const request of [github(), github({searchFails:true})]) {
+    const {suggestions} = await discoverSkills(root, context, "typescript", request);
+    assert.deepEqual(suggestions.map(s => s.reference), ["default:languages/typescript"]);
+    assert.equal(suggestions[0].url, undefined);
+  }
+});
+
 test("checks a project's pinned native skill against its synced registry, including supporting files", async t => {
   const { runGitOutput } = await import("../src/core/git.js");
   const { registrySkillChanges } = await import("../src/core/registry-updates.js");
@@ -145,6 +157,21 @@ test("sync checks GitHub after success, preserves its exit status offline and ho
     ["--import", loader, "--import", mock, cli, ...args], {cwd: root, env: {
       ...process.env, ASKILLS_HOME: path.join(root, "home"), ASKILLS_REGISTRY_PATH: source
     }});
+  const nested = path.join(root,"src","nested");
+  await fs.mkdir(nested, {recursive:true});
+  const discoverFrom = async (cwd: string, command = "discover") => (await exec(process.execPath,
+    ["--import", loader, "--import", mock, cli, command], {cwd,env:{...process.env, ASKILLS_HOME:path.join(root,"home"), ASKILLS_REGISTRY_PATH:source}})).stdout;
+  const local = path.join(source,"skills/global/extra");
+  await fs.mkdir(local);
+  await fs.writeFile(path.join(local,"SKILL.md"), "---\nname: extra\ndescription: TypeScript helper\n---\nExtra");
+  await fs.writeFile(path.join(root,"tsconfig.json"), "{}");
+  await fs.writeFile(path.join(root,"package.json"), '{"devDependencies":{"typescript":"5"}}');
+  const rootReport = await discoverFrom(root);
+  assert.match(rootReport, /askills add default:global\/extra --pool/);
+  assert.equal(await discoverFrom(nested), rootReport);
+  assert.match(await discoverFrom(nested,"sync"), /askills add default:global\/extra --pool/);
+  await fs.mkdir(path.join(nested,".git"));
+  assert.doesNotMatch(await discoverFrom(nested), /askills add default:global\/extra --pool/);
   const before = await fs.readFile(path.join(root, ".agent-skills.yaml"), "utf8");
   const normal = await run("sync");
   assert.match(normal.stdout, /Registries updated[\s\S]*GitHub skill suggestions/);

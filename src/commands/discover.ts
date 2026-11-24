@@ -1,14 +1,16 @@
 import { discoverSkills } from "../core/discovery.js";
 import { createRegistryContext, loadRegistryDefinitions } from "../core/registry-config.js";
 
-import { loadProjectConfig, projectConfigExists } from "../core/project-config.js";
+import { findProjectRoot, loadProjectConfig } from "../core/project-config.js";
 import { projectSkillPool } from "../core/project-pool.js";
 import { registrySkillChanges } from "../core/registry-updates.js";
 
 export async function discoverCommand(query = ""): Promise<void> {
-  const root = process.cwd();
+  // Same lookup as the Claude hook, so a subdirectory reports on the project's lock and pool.
+  const project = await findProjectRoot(process.cwd());
+  const root = project ?? process.cwd();
   const hasRegistry = (await loadRegistryDefinitions()).length > 0;
-  const context = hasRegistry || await projectConfigExists(root) ? await createRegistryContext(root) : undefined;
+  const context = hasRegistry || project ? await createRegistryContext(root) : undefined;
   const report = await discoverSkills(root, context, query);
   const latest = context?.registries.some(item => item.commit) ? await createRegistryContext(root, { useLock: false }) : undefined;
   const registry = context && latest
@@ -17,7 +19,7 @@ export async function discoverCommand(query = ""): Promise<void> {
   // A removed skill is fine if the latest profile and config no longer ask for it; otherwise
   // --update-lock would fail, so name the reference that still needs fixing instead.
   let blocked: string | undefined;
-  if (latest && registry.updates.some(item => item.status === "removed") && await projectConfigExists(root)) {
+  if (project && latest && registry.updates.some(item => item.status === "removed")) {
     try {
       await projectSkillPool(await loadProjectConfig(root), latest, root);
     } catch (error) {
@@ -31,7 +33,8 @@ export async function discoverCommand(query = ""): Promise<void> {
     if (item.license) reasons.push(`repository license: ${item.license}`);
     if (item.reference) reasons.push("available in your registry");
     console.log(`  ${item.name} — ${reasons.join(", ")}`);
-    console.log(`    ${item.description.slice(0, 180)}\n    ${item.url}`);
+    console.log(`    ${item.description.slice(0, 180)}`);
+    if (item.url) console.log(`    ${item.url}`);
     console.log(item.reference ? `    askills add ${item.reference} --pool` :
       "    Review this pinned skill directory for import into your registry.");
   }
