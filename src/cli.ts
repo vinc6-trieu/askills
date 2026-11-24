@@ -48,6 +48,9 @@ import {
   searchCommand
 } from "./commands/skills.js";
 
+import { claudeHookCommand } from "./commands/claude-hook.js";
+import { discoverCommand } from "./commands/discover.js";
+
 const program = new Command();
 
 program
@@ -77,9 +80,23 @@ program
   .description(
     "Update the installed skill registry"
   )
-  .action(async () => {
-    await syncCommand();
+  .option("--no-discover", "Skip GitHub skill suggestions after syncing")
+  .action(async (options: { discover: boolean }) => {
+    await syncCommand(options);
   });
+
+program.command("claude-hook")
+  .description("Suggest project skills on Claude Code prompt submission")
+  .option("--enable", "Enable suggestions in this project's local Claude settings")
+  .option("--disable", "Remove the askills hook from local Claude settings")
+  .option("--registry-path <path>", "Registry override for this invocation")
+  .option("--askills-home <path>", "Machine configuration directory for this invocation")
+  .action(claudeHookCommand);
+
+program.command("discover")
+  .description("Suggest GitHub skills and check pinned upstream skill directories for changes")
+  .argument("[query]", "Filter suggestions by skill keywords")
+  .action(async (query?: string) => { await discoverCommand(query); });
 
 program.command("doctor")
   .description("Validate registry, lock, and skill metadata")

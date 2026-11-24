@@ -635,6 +635,48 @@ The generated symlinks are added to `.git/info/exclude` (a local,
 uncommitted ignore) so they never show up as untracked files, while a
 project-owned skill of the same name is left untouched.
 
+### Suggest skills as you chat
+
+After bootstrap, enable prompt suggestions once in the project:
+
+```bash
+askills claude-hook --enable
+```
+
+Start a new local Claude Code session in VS Code, the Desktop Code tab, or
+the terminal. For example, type `review @src/core/agent-runner.ts cho tôi nhé`.
+On a match, the hook sends Claude the suggested skill names and emits a
+short user-facing notice for direct matches such as `askills suggests /code-review`. Claude
+decides which skills to invoke. You can also type `/code-review` directly.
+
+With `global/requirements-discovery` in the project pool, a request such as
+`giúp tôi làm rõ yêu cầu này trước` suggests the skill by name. For an open
+retry or duplicate-record policy, the hook can also suggest it privately to
+Claude. The hint asks Claude to check earlier decisions and project evidence,
+then ask one question only if the answer would change the result. The hook
+uses the current prompt and leaves conversation history with Claude.
+
+The hook uses the project's existing resolver, profile and lock. Up to eight
+existing in-project `@file` references can select path-specific profiles.
+Quoted paths with spaces and VS Code line selections are supported. The hook
+checks that each Claude skill link points at the selected registry skill.
+An explicit slash command, a prompt with no matching skill, or an unavailable
+registry proceeds without a suggestion. Profile-wide `always` skills stay
+available through native discovery. The hook does not sync or contact GitHub.
+
+Enabling writes a [UserPromptSubmit command hook](https://code.claude.com/docs/en/hooks#userpromptsubmit)
+to `.claude/settings.local.json`. It records the local Node and askills CLI
+paths and any explicit `ASKILLS_HOME` or `ASKILLS_REGISTRY_PATH` overrides
+so GUI sessions can use the same registry as the terminal. Run enable again
+after moving the installation. To remove the hook, run:
+
+```bash
+askills claude-hook --disable
+```
+
+When working from a source checkout, use `npm run build` followed by
+`node dist/cli.js claude-hook --enable`.
+
 ---
 
 # Commands
@@ -671,7 +713,65 @@ Equivalent conceptually to updating:
 ~/.askills/registries/*
 ```
 
-from its Git remote.
+from its Git remote. After each successful sync, askills prints GitHub
+skill suggestions and checks active skills for updates. Use
+`askills sync --no-discover` to skip this step for that run.
+
+### Discover skills and review updates
+
+```bash
+askills discover                # run the same checks on demand
+askills discover typescript     # filter suggestions by keyword
+```
+
+Discovery searches GitHub's `agent-skills` topic for the five highest-starred
+public collections with `skills` in their name, at least 50 stars and an
+active, non-fork repository. It samples up to
+four candidate `SKILL.md` files per repository, skipping hidden project tooling,
+fixtures and templates. It matches skill names, paths and descriptions to your
+project’s languages, frameworks, dependencies and common coding workflows,
+or to your explicit query. A candidate needs
+a valid skill name, a description and a non-empty instruction body. The report shows up to five unique
+suggestions, with matches, repository stars, available license metadata and a
+commit-pinned source link. The search sent to GitHub is public and generic.
+Project keywords are matched locally.
+
+For a skill already available in your registry, the report prints the exact
+`askills add <registry:skill> --pool` command. Run `askills bootstrap`
+after adding it. For an external candidate, open its pinned directory to
+review the skill, supporting files and license. To import it, copy the
+reviewed directory and license notices into a writable registry checkout
+under `skills/<layer>/<id>/`, add [routing metadata](#skillmetayaml), and
+record its source in `UPSTREAM.json` beside `SKILL.md`:
+
+```json
+{
+  "repository": "https://github.com/owner/repo",
+  "commit": "<full upstream commit SHA>",
+  "sourcePath": "skills/example"
+}
+```
+
+Publish the reviewed registry change, run `askills sync`, refresh a pinned
+project with `askills bootstrap --update-lock`, then run
+`askills add <layer>/<id> --pool` and `askills bootstrap`.
+
+A project checks its profile skills (including path-mapped profiles) and
+explicit pool/includes, respecting exclusions. Outside a configured project,
+discovery checks skills from the configured registries. There are two update
+signals:
+
+- A skill directory differs between the project lock and the synced registry.
+  Review the registry changes before adopting the new lock.
+- A skill with GitHub provenance differs between its imported commit and
+  the upstream default branch. Directory comparisons cover supporting files
+  as well as `SKILL.md`. A missing directory is reported separately.
+  Refresh the registry import after reviewing upstream changes.
+
+Discovery only prints recommendations. GitHub failures and partial scans appear
+as warnings. A successful registry sync still succeeds if discovery cannot
+reach GitHub. For higher API limits, set `ASKILLS_GITHUB_TOKEN` to a
+read-only GitHub token.
 
 ## Skill inspection and project overrides
 

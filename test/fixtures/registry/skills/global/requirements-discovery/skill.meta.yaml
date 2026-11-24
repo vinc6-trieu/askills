@@ -1,0 +1,4 @@
+id: global/requirements-discovery
+kind: process
+intents: [requirements]
+priority: 92
