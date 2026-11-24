@@ -1,3 +1,4 @@
+import type { BootstrapTransaction } from "./bootstrap-transaction.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -10,7 +11,8 @@ const GENERATED_ENTRIES = [
 ];
 
 export async function ensureAskillsGitignore(
-  root = process.cwd()
+  root = process.cwd(),
+  writer: Pick<BootstrapTransaction, "writeFile"> = fs
 ): Promise<void> {
   const file = path.join(
     root,
@@ -58,9 +60,5 @@ export async function ensureAskillsGitignore(
     next += `${entry}\n`;
   }
 
-  await fs.writeFile(
-    file,
-    next,
-    "utf8"
-  );
+  await writer.writeFile(file, next);
 }

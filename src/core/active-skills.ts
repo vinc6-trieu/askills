@@ -1,4 +1,4 @@
-import fs from "node:fs/promises";
+import type { BootstrapTransaction } from "./bootstrap-transaction.js";
 import path from "node:path";
 import YAML from "yaml";
 
@@ -20,38 +20,11 @@ function flattenId(
   );
 }
 
-async function linkDirectory(
-  source: string,
-  target: string
-): Promise<void> {
-  await fs.mkdir(
-    path.dirname(target),
-    {
-      recursive: true
-    }
-  );
-
-  await fs.rm(
-    target,
-    {
-      recursive: true,
-      force: true
-    }
-  );
-
-  await fs.symlink(
-    source,
-    target,
-    process.platform === "win32"
-      ? "junction"
-      : "dir"
-  );
-}
-
 export async function materializeActiveSkills(
   ids: string[],
-  root = process.cwd(),
-  context?: RegistryContext
+  root: string,
+  context: RegistryContext,
+  transaction: BootstrapTransaction
 ): Promise<SkillDescriptor[]> {
   const runtimeRoot =
     path.join(
@@ -65,20 +38,8 @@ export async function materializeActiveSkills(
       "active"
     );
 
-  await fs.rm(
-    activeRoot,
-    {
-      recursive: true,
-      force: true
-    }
-  );
-
-  await fs.mkdir(
-    activeRoot,
-    {
-      recursive: true
-    }
-  );
+  await transaction.remove(activeRoot);
+  await transaction.directory(activeRoot);
 
   const descriptors:
     SkillDescriptor[] = [];
@@ -112,7 +73,7 @@ export async function materializeActiveSkills(
       id
     );
 
-    await linkDirectory(
+    await transaction.link(
       descriptor.path,
       path.join(
         activeRoot,
@@ -125,7 +86,7 @@ export async function materializeActiveSkills(
     );
   }
 
-  await fs.writeFile(
+  await transaction.writeFile(
     path.join(
       runtimeRoot,
       "active.yaml"
@@ -140,8 +101,7 @@ export async function materializeActiveSkills(
             name: skill.name
           })
         )
-    }),
-    "utf8"
+    })
   );
 
   return descriptors;

@@ -219,7 +219,7 @@ export async function resolveSkills(
       (await registryContext.resolveSkill(id)).reference
     ));
 
-  const normalizedExclude = await normalizeIds(overrides.exclude ?? []);
+  const normalizedExclude = await Promise.all((overrides.exclude ?? []).map(id => registryContext.exclusionReference(id)));
   const normalizedInclude = await normalizeIds(overrides.include ?? []);
   const normalizedPool = await normalizeIds(overrides.pool ?? []);
   const requested = await normalizeIds(overrides.skills ?? []);

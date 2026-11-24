@@ -6,7 +6,7 @@ import {
 import {
   resolveTask, type RoutingOptions
 } from "./task-routing.js";
-import { lockProjectRegistries } from "./registry-config.js";
+import { withProjectBootstrap, type BootstrapTransaction } from "./bootstrap-transaction.js";
 import { loadSkillDescriptor } from "./skill-frontmatter.js";
 
 import {
@@ -18,7 +18,7 @@ import {
 } from "../commands/init.js";
 
 import {
-  bootstrapCommand
+  applyBootstrap
 } from "../commands/bootstrap.js";
 
 import type {
@@ -48,40 +48,22 @@ export async function prepareAgentTask(
   root = process.cwd(),
   options: RoutingOptions & { dryRun?: boolean } = {}
 ): Promise<PreparedAgentTask> {
-  // Validate and preview without touching config, caches, guides, or links.
-  let routed = await resolveTask(task, root, options);
-  if (!options.dryRun) {
-    if (!(await projectConfigExists(root))) await initCommand({ auto: true }, root);
-    await lockProjectRegistries(root);
-    // Use exactly the locked snapshot for both selection and materialization.
-    routed = await resolveTask(task, root, options);
-  }
-  const { config, resolution, context } = routed;
-
-  const ids = [
-    ...new Set([
-      ...resolution.always,
-
-      ...resolution.selected.map(
-        skill => skill.id
-      )
-    ])
-  ];
-
-  let activeSkills: SkillDescriptor[];
-  if (options.dryRun) {
-    activeSkills = await Promise.all(ids.map(id => loadSkillDescriptor(id, context)));
-  } else {
-    await bootstrapCommand({ root, extraSkills: ids });
-    activeSkills = await materializeActiveSkills(ids, root, context);
+  async function prepare(routed: Awaited<ReturnType<typeof resolveTask>>, transaction?: BootstrapTransaction) {
+    const { config, resolution, context, paths } = routed;
+    const ids = [...new Set([...resolution.always, ...resolution.selected.map(skill => skill.id)])];
+    let activeSkills: SkillDescriptor[];
+    if (transaction) {
+      await applyBootstrap(root, context, transaction, ids);
+      activeSkills = await materializeActiveSkills(ids, root, context, transaction);
+    } else {
+      activeSkills = await Promise.all(ids.map(id => loadSkillDescriptor(id, context)));
+    }
+    return { root, task, config, resolution, activeSkills, paths };
   }
 
-  return {
-    root,
-    task,
-    config,
-    resolution,
-    activeSkills,
-    paths: routed.paths
-  };
+  const preview = await resolveTask(task, root, options);
+  if (options.dryRun) return prepare(preview);
+  if (!(await projectConfigExists(root))) await initCommand({ auto: true }, root);
+  return withProjectBootstrap(root, false, async (context, transaction) =>
+    prepare(await resolveTask(task, root, options, context), transaction));
 }

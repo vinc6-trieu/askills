@@ -1,3 +1,4 @@
+import type { BootstrapTransaction } from "./bootstrap-transaction.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -86,7 +87,8 @@ function renderBlock(
 export async function writeAgentGuides(
   skills: SkillDescriptor[],
   enabled: boolean,
-  root = process.cwd()
+  root: string,
+  transaction: BootstrapTransaction
 ): Promise<AgentGuideResult> {
   const blockPattern =
     new RegExp(
@@ -114,7 +116,8 @@ export async function writeAgentGuides(
         file,
         "utf8"
       );
-    } catch {
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       hadFile = false;
     }
 
@@ -137,17 +140,11 @@ export async function writeAgentGuides(
         /*
          * The file only ever held the askills block.
          */
-        await fs.rm(
-          file,
-          {
-            force: true
-          }
-        );
+        await transaction.remove(file);
       } else {
-        await fs.writeFile(
+        await transaction.writeFile(
           file,
-          `${base}\n`,
-          "utf8"
+          `${base}\n`
         );
       }
 
@@ -161,11 +158,7 @@ export async function writeAgentGuides(
         ? `${base}\n\n${block}\n`
         : `${block}\n`;
 
-    await fs.writeFile(
-      file,
-      next,
-      "utf8"
-    );
+    await transaction.writeFile(file, next);
 
     written.push(name);
   }

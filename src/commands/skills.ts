@@ -96,7 +96,7 @@ export async function addCommand(reference: string, options: { pool?: boolean } 
     ? currentIncludes.filter(isOther)
     : unique([...currentIncludes, skill.reference]);
   const pool = options.pool ? unique([...(currentPool ?? []), skill.reference]) : currentPool;
-  const exclude = (await normalize(config.skills?.exclude ?? [])).filter(isOther);
+  const exclude = (await Promise.all((config.skills?.exclude ?? []).map(id => context.exclusionReference(id)))).filter(isOther);
 
   await writeProjectConfig({
     ...config,

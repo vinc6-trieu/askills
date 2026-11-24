@@ -1,7 +1,8 @@
 import { discoverSkills } from "../core/discovery.js";
 import { createRegistryContext, loadRegistryDefinitions } from "../core/registry-config.js";
 
-import { projectConfigExists } from "../core/project-config.js";
+import { loadProjectConfig, projectConfigExists } from "../core/project-config.js";
+import { projectSkillPool } from "../core/project-pool.js";
 import { registrySkillChanges } from "../core/registry-updates.js";
 
 export async function discoverCommand(query = ""): Promise<void> {
@@ -9,9 +10,20 @@ export async function discoverCommand(query = ""): Promise<void> {
   const hasRegistry = (await loadRegistryDefinitions()).length > 0;
   const context = hasRegistry || await projectConfigExists(root) ? await createRegistryContext(root) : undefined;
   const report = await discoverSkills(root, context, query);
-  const registry = context?.registries.some(item => item.commit)
-    ? await registrySkillChanges(context, await createRegistryContext(root, { useLock: false }), report.active)
+  const latest = context?.registries.some(item => item.commit) ? await createRegistryContext(root, { useLock: false }) : undefined;
+  const registry = context && latest
+    ? await registrySkillChanges(context, latest, report.active)
     : { updates: [], warnings: [] };
+  // A removed skill is fine if the latest profile and config no longer ask for it; otherwise
+  // --update-lock would fail, so name the reference that still needs fixing instead.
+  let blocked: string | undefined;
+  if (latest && registry.updates.some(item => item.status === "removed") && await projectConfigExists(root)) {
+    try {
+      await projectSkillPool(await loadProjectConfig(root), latest, root);
+    } catch (error) {
+      blocked = error instanceof Error ? error.message : String(error);
+    }
+  }
   console.log("\nGitHub skill suggestions");
   for (const item of report.suggestions) {
     const reasons = item.matches.map(term => `matches ${term}`);
@@ -28,7 +40,10 @@ export async function discoverCommand(query = ""): Promise<void> {
   for (const item of registry.updates) {
     console.log(`  ${item.reference} — synced registry directory ${item.status} (${item.previous.slice(0, 8)} → ${item.current.slice(0, 8)})`);
   }
-  if (registry.updates.length) console.log("  To adopt the synced registry revisions for this project: askills bootstrap --update-lock");
+  if (blocked) {
+    console.log(`  The synced registry cannot be adopted yet: ${blocked}`);
+    console.log("  Remove or replace that reference (or exclude the skill with askills remove), then run askills bootstrap --update-lock.");
+  } else if (registry.updates.length) console.log("  To adopt the synced registry revisions for this project: askills bootstrap --update-lock");
   for (const item of report.updates) {
     console.log(`  ${item.reference} — upstream directory ${item.status} (${item.previous.slice(0, 8)} → ${item.current.slice(0, 8)})`);
     console.log(`    ${item.url}`);

@@ -11,11 +11,16 @@ export async function projectSkillPool(config: ProjectConfig, context: RegistryC
     config.profile, ...(config.routing?.paths.map(route => route.profile) ?? [])
   ]).map(name => resolveProfile(name, context, root)));
 
-  const normalize = (ids: string[]) => Promise.all(ids.map(async id => (await context.resolveSkill(id)).reference));
-  const include = await normalize(config.skills?.include ?? []);
-  const pool = await normalize(config.skills?.pool ?? []);
-  const extra = await normalize(extraSkills);
-  const exclude = new Set(await normalize(config.skills?.exclude ?? []));
+  async function required(ids: string[], field: string) {
+    return Promise.all(ids.map(async id => {
+      try { return (await context.resolveSkill(id)).reference; }
+      catch (error) { throw new Error(`${field} references ${id}: ${(error as Error).message}`); }
+    }));
+  }
+  const include = await required(config.skills?.include ?? [], ".agent-skills.yaml skills.include");
+  const pool = await required(config.skills?.pool ?? [], ".agent-skills.yaml skills.pool");
+  const extra = await required(extraSkills, "Requested skills");
+  const exclude = new Set(await Promise.all((config.skills?.exclude ?? []).map(id => context.exclusionReference(id))));
 
   const ids = unique([
     ...profiles.flatMap(profile => profile.always),

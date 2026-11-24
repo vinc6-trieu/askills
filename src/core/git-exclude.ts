@@ -1,3 +1,4 @@
+import type { BootstrapTransaction } from "./bootstrap-transaction.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -53,7 +54,8 @@ async function getExcludeFile(
 
 export async function writeAskillsLocalExcludes(
   entries: string[],
-  root = process.cwd()
+  root: string,
+  transaction: BootstrapTransaction
 ): Promise<void> {
   const file =
     await getExcludeFile(root);
@@ -62,12 +64,7 @@ export async function writeAskillsLocalExcludes(
     return;
   }
 
-  await fs.mkdir(
-    path.dirname(file),
-    {
-      recursive: true
-    }
-  );
+  await transaction.directory(path.dirname(file));
 
   let content = "";
 
@@ -77,8 +74,8 @@ export async function writeAskillsLocalExcludes(
         file,
         "utf8"
       );
-  } catch {
-    // File may not exist yet.
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
 
   const blockPattern =
@@ -115,11 +112,7 @@ export async function writeAskillsLocalExcludes(
     content += `${END}\n`;
   }
 
-  await fs.writeFile(
-    file,
-    content,
-    "utf8"
-  );
+  await transaction.writeFile(file, content);
 }
 
 function escapeRegExp(
